@@ -225,12 +225,12 @@ openclaw-approve-browser
 ```
 命令执行完毕后，回到浏览器刷新页面即可直接进入面板。
 
-### 5. 浏览器访问报错 `502 Bad Gateway`
+### 6. 浏览器访问报错 `502 Bad Gateway`
 **原因：** 部署尚未完全结束，或者宿主机上的 OpenClaw Gateway / Caddy 服务未成功启动，或正在重启中。  
 **解决办法：**  
 1. 刚刚部署完毕时，请等待 1-2 分钟让组件完全启动。
 2. 如果持续报错，请登录至虚拟机排查服务状态：
-   ```bash
+  ```bash
   # 查看 OpenClaw 和 Caddy 服务状态
   sudo systemctl status openclaw-gateway caddy --no-pager
 
@@ -239,9 +239,9 @@ openclaw-approve-browser
 
   # 查看 Caddy 的最近日志
   sudo journalctl -u caddy -n 100 --no-pager
-   ```
+  ```
 
-### 6. 无法连接虚拟机（Connection Timed Out）
+### 7. 无法连接虚拟机（Connection Timed Out）
 **原因：** 虚拟机实例没有成功获取公网 IP，或者其 22 / 443 端口被安全组（NSG）阻挡。  
 **解决办法：**  
 - 在 Azure 门户中前往您刚刚部署的**虚拟机**页面。
@@ -467,12 +467,12 @@ openclaw-approve-browser
 ```
 After the command finishes, refresh the browser page to enter the dashboard.
 
-### 5. The browser shows `502 Bad Gateway`
+### 6. The browser shows `502 Bad Gateway`
 **Cause:** Deployment may not be fully finished yet, or the host-level OpenClaw Gateway or Caddy service may have failed to start or may still be restarting.  
 **Resolution:**
 1. If deployment just finished, wait 1 to 2 minutes and let all components start completely.
 2. If the issue persists, SSH into the virtual machine and inspect the service status:
-   ```bash
+  ```bash
   # Check the OpenClaw and Caddy service status
   sudo systemctl status openclaw-gateway caddy --no-pager
 
@@ -481,9 +481,9 @@ After the command finishes, refresh the browser page to enter the dashboard.
 
   # Inspect recent Caddy logs
   sudo journalctl -u caddy -n 100 --no-pager
-   ```
+  ```
 
-### 6. I cannot connect to the virtual machine (`Connection Timed Out`)
+### 7. I cannot connect to the virtual machine (`Connection Timed Out`)
 **Cause:** The virtual machine may not have received a public IP successfully, or ports 22 and 443 may be blocked by the Network Security Group (NSG).  
 **Resolution:**
 - In Azure portal, open the **Virtual Machine** page for the deployment you just created.
