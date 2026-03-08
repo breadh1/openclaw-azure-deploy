@@ -1,0 +1,338 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vmName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 64,
+      "metadata": {
+        "description": "Name of the OpenClaw VM."
+      }
+    },
+    "adminUsername": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "metadata": {
+        "description": "Linux administrator username for SSH access."
+      }
+    },
+    "sshPublicKey": {
+      "type": "string",
+      "metadata": {
+        "description": "SSH public key used to sign in to the VM."
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_B2as_v2",
+      "metadata": {
+        "description": "VM size for the personal deployment."
+      }
+    },
+    "dataDiskSizeGb": {
+      "type": "int",
+      "defaultValue": 32,
+      "minValue": 32,
+      "maxValue": 1024,
+      "metadata": {
+        "description": "Managed data disk size in GiB for /data."
+      }
+    },
+    "hostname": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional custom hostname. If empty, Azure-generated public DNS is used."
+      }
+    },
+    "azureOpenAiEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure OpenAI resource endpoint, for example https://myresource.openai.azure.com."
+      }
+    },
+    "azureOpenAiDeployment": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure OpenAI deployment name used by OpenClaw as the primary model ref."
+      }
+    },
+    "azureOpenAiApiKey": {
+      "type": "secureString",
+      "minLength": 1,
+      "metadata": {
+        "description": "API key for the Azure OpenAI resource."
+      }
+    }
+  },
+  "variables": {
+    "vnetName": "[format('{0}-vnet', parameters('vmName'))]",
+    "subnetName": "default",
+    "nsgName": "[format('{0}-nsg', parameters('vmName'))]",
+    "publicIpName": "[format('{0}-pip', parameters('vmName'))]",
+    "nicName": "[format('{0}-nic', parameters('vmName'))]",
+    "dataDiskName": "[format('{0}-data', parameters('vmName'))]",
+    "dnsLabel": "[take(toLower(replace(concat(parameters('vmName'), '-', uniqueString(resourceGroup().id)), '_', '-')), 63)]",
+    "openclawPort": 18789,
+    "browserControlPort": 18791,
+    "publicFqdn": "[format('{0}.{1}.cloudapp.azure.com', variables('dnsLabel'), resourceGroup().location)]",
+    "publicOrigin": "[format('https://{0}', variables('publicFqdn'))]",
+    "hostnameOrigin": "[if(empty(parameters('hostname')), '', format('https://{0}', parameters('hostname')))]",
+    "publicControlUrl": "[if(empty(parameters('hostname')), format('https://{0}/', variables('publicFqdn')), format('https://{0}/', parameters('hostname')))]",
+    "allowedOriginsJson": "[if(empty(parameters('hostname')), concat('[\"', variables('publicOrigin'), '\"]'), concat('[\"', variables('publicOrigin'), '\",\"', variables('hostnameOrigin'), '\"]'))]",
+    "openclawImage": "ghcr.io/openclaw/openclaw:latest",
+    "azureOpenAiBaseUrl": "[if(endsWith(parameters('azureOpenAiEndpoint'), '/'), format('{0}openai/v1/', parameters('azureOpenAiEndpoint')), format('{0}/openai/v1/', parameters('azureOpenAiEndpoint')))]",
+    "defaultModelRef": "[format('openai/{0}', parameters('azureOpenAiDeployment'))]",
+    "caddySiteAddresses": "[if(empty(parameters('hostname')), variables('publicFqdn'), format('{0}, {1}', variables('publicFqdn'), parameters('hostname')))]",
+    "caddyConfig": "[concat(variables('caddySiteAddresses'), ' {\n', '    encode zstd gzip\n', '    reverse_proxy 127.0.0.1:', string(variables('openclawPort')), '\n', '}\n')]",
+    "caddyConfigBase64": "[base64(variables('caddyConfig'))]",
+    "openclawConfig": "[concat('{\n', '  \"agents\": {\n', '    \"defaults\": {\n', '      \"workspace\": \"/data/workspace\",\n', '      \"model\": { \"primary\": \"', variables('defaultModelRef'), '\" }\n', '    }\n', '  },\n', '  \"models\": {\n', '    \"mode\": \"merge\",\n', '    \"providers\": {\n', '      \"openai\": {\n', '        \"baseUrl\": \"', variables('azureOpenAiBaseUrl'), '\",\n', '        \"apiKey\": \"${OPENAI_API_KEY}\",\n', '        \"api\": \"openai-responses\",\n', '        \"models\": [\n', '          {\n', '            \"id\": \"', parameters('azureOpenAiDeployment'), '\",\n', '            \"name\": \"Azure OpenAI ', parameters('azureOpenAiDeployment'), '\",\n', '            \"reasoning\": false,\n', '            \"input\": [\"text\", \"image\"],\n', '            \"cost\": { \"input\": 0, \"output\": 0, \"cacheRead\": 0, \"cacheWrite\": 0 },\n', '            \"contextWindow\": 200000,\n', '            \"maxTokens\": 16384\n', '          }\n', '        ]\n', '      }\n', '    }\n', '  },\n', '  \"gateway\": {\n', '    \"mode\": \"local\",\n', '    \"bind\": \"loopback\",\n', '    \"port\": ', string(variables('openclawPort')), ',\n', '    \"controlUi\": {\n', '      \"enabled\": true,\n', '      \"allowedOrigins\": ', variables('allowedOriginsJson'), '\n', '    },\n', '    \"auth\": {\n', '      \"mode\": \"token\",\n', '      \"token\": \"${OPENCLAW_GATEWAY_TOKEN}\"\n', '    }\n', '  }\n', '}')]",
+    "openclawConfigBase64": "[base64(variables('openclawConfig'))]",
+    "bootstrapScript": "[format('#!/usr/bin/env bash\nset -euxo pipefail\nexport DEBIAN_FRONTEND=noninteractive\ncloud-init status --wait || true\nwhile fuser /var/lib/dpkg/lock >/dev/null 2>&1 || fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do sleep 5; done\napt-get update\napt-get install -y docker.io ca-certificates\ninstall -d -m 0700 /etc/openclaw /etc/caddy /var/lib/openclaw-caddy/data /var/lib/openclaw-caddy/config\nTOKEN=$(head -c 24 /dev/urandom | base64 | tr -d ''\\n'' | tr ''/+'' ''_-'')\ncat > /etc/openclaw/openclaw.env <<EOF\nHOME=/home/node\nOPENCLAW_STATE_DIR=/data\nOPENCLAW_CONFIG_PATH=/data/openclaw.json\nOPENCLAW_GATEWAY_PORT={0}\nOPENCLAW_GATEWAY_TOKEN=$TOKEN\nOPENCLAW_PUBLIC_URL={5}\nOPENAI_API_KEY={1}\nEOF\nchmod 600 /etc/openclaw/openclaw.env\ncat > /usr/local/bin/openclaw-browser-url <<''EOF''\n#!/usr/bin/env bash\nset -euo pipefail\nsudo sh -lc ''. /etc/openclaw/openclaw.env && printf \"Dashboard URL: %s#token=%s\\n\" \"$OPENCLAW_PUBLIC_URL\" \"$OPENCLAW_GATEWAY_TOKEN\"''\nEOF\nchmod 755 /usr/local/bin/openclaw-browser-url\ncat > /usr/local/bin/openclaw-approve-browser <<''EOF''\n#!/usr/bin/env bash\nset -euo pipefail\nsudo docker exec openclaw-gateway sh -lc ''node dist/index.js devices approve --latest''\nEOF\nchmod 755 /usr/local/bin/openclaw-approve-browser\nDATA_DEVICE=/dev/disk/azure/scsi1/lun0\nmkdir -p /data /data/workspace\nif [ -b \"$DATA_DEVICE\" ]; then\n  if ! blkid \"$DATA_DEVICE\" >/dev/null 2>&1; then\n    mkfs.ext4 -F \"$DATA_DEVICE\"\n  fi\n  uuid=$(blkid -s UUID -o value \"$DATA_DEVICE\")\n  if ! grep -q \"$uuid\" /etc/fstab; then\n    echo \"UUID=$uuid /data ext4 defaults,nofail 0 2\" >> /etc/fstab\n  fi\n  mount -a\nfi\nmkdir -p /data/workspace\nchown -R 1000:1000 /data\nprintf ''%s'' ''{2}'' | base64 -d > /data/openclaw.json\nprintf ''%s'' ''{3}'' | base64 -d > /etc/caddy/Caddyfile\nsystemctl enable docker\nsystemctl restart docker\ndocker pull {4}\ndocker rm -f openclaw-gateway openclaw-caddy || true\ndocker run -d --name openclaw-gateway --restart unless-stopped --network host --env-file /etc/openclaw/openclaw.env -v /data:/data {4} node dist/index.js gateway --bind loopback --port {0}\ndocker run -d --name openclaw-caddy --restart unless-stopped --network host -v /etc/caddy/Caddyfile:/etc/caddy/Caddyfile:ro -v /var/lib/openclaw-caddy/data:/data -v /var/lib/openclaw-caddy/config:/config caddy:2 caddy run --config /etc/caddy/Caddyfile --adapter caddyfile\n', string(variables('openclawPort')), parameters('azureOpenAiApiKey'), variables('openclawConfigBase64'), variables('caddyConfigBase64'), variables('openclawImage'), variables('publicControlUrl'))]",
+    "bootstrapScriptBase64": "[base64(variables('bootstrapScript'))]",
+    "cloudInit": "[concat('#cloud-config\n')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2024-05-01",
+      "name": "[variables('nsgName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "allow-ssh",
+            "properties": {
+              "priority": 1000,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "22",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*"
+            }
+          },
+          {
+            "name": "allow-http",
+            "properties": {
+              "priority": 1010,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "80",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*"
+            }
+          },
+          {
+            "name": "allow-https",
+            "properties": {
+              "priority": 1020,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2024-05-01",
+      "name": "[variables('publicIpName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "Standard",
+        "tier": "Regional"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "Static",
+        "publicIPAddressVersion": "IPv4",
+        "dnsSettings": {
+          "domainNameLabel": "[variables('dnsLabel')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2024-05-01",
+      "name": "[variables('vnetName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "10.40.0.0/16"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('subnetName')]",
+            "properties": {
+              "addressPrefix": "10.40.0.0/24",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+              }
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2024-05-01",
+      "name": "[variables('nicName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), variables('subnetName'))]"
+              },
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpName'))]"
+              }
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Compute/disks",
+      "apiVersion": "2024-03-02",
+      "name": "[variables('dataDiskName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "StandardSSD_LRS"
+      },
+      "properties": {
+        "creationData": {
+          "createOption": "Empty"
+        },
+        "diskSizeGB": "[parameters('dataDiskSizeGb')]"
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2024-03-01",
+      "name": "[parameters('vmName')]",
+      "location": "[resourceGroup().location]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('vmName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "customData": "[base64(variables('cloudInit'))]",
+          "linuxConfiguration": {
+            "disablePasswordAuthentication": true,
+            "ssh": {
+              "publicKeys": [
+                {
+                  "path": "[format('/home/{0}/.ssh/authorized_keys', parameters('adminUsername'))]",
+                  "keyData": "[parameters('sshPublicKey')]"
+                }
+              ]
+            }
+          }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "Canonical",
+            "offer": "ubuntu-24_04-lts",
+            "sku": "server",
+            "version": "latest"
+          },
+          "osDisk": {
+            "createOption": "FromImage",
+            "managedDisk": {
+              "storageAccountType": "StandardSSD_LRS"
+            }
+          },
+          "dataDisks": [
+            {
+              "lun": 0,
+              "createOption": "Attach",
+              "managedDisk": {
+                "id": "[resourceId('Microsoft.Compute/disks', variables('dataDiskName'))]"
+              }
+            }
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Compute/disks', variables('dataDiskName'))]",
+        "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+      "apiVersion": "2024-03-01",
+      "name": "[format('{0}/{1}', parameters('vmName'), 'openclaw-bootstrap')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "publisher": "Microsoft.Azure.Extensions",
+        "type": "CustomScript",
+        "typeHandlerVersion": "2.1",
+        "autoUpgradeMinorVersion": true,
+        "settings": {},
+        "protectedSettings": {
+          "commandToExecute": "[format('bash -lc \"printf ''''%s'''' ''''{0}'''' | base64 -d > /tmp/openclaw-bootstrap.sh && chmod 700 /tmp/openclaw-bootstrap.sh && /tmp/openclaw-bootstrap.sh\"', variables('bootstrapScriptBase64'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "resourceGroupName": {
+      "type": "string",
+      "value": "[resourceGroup().name]"
+    },
+    "vmName": {
+      "type": "string",
+      "value": "[parameters('vmName')]"
+    },
+    "vmPublicIp": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpName')), '2024-05-01').ipAddress]"
+    },
+    "vmPublicFqdn": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpName')), '2024-05-01').dnsSettings.fqdn]"
+    },
+    "openclawPublicUrl": {
+      "type": "string",
+      "value": "[variables('publicControlUrl')]"
+    }
+  }
+}
