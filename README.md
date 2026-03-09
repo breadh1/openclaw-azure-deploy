@@ -6,6 +6,10 @@ Use the button below to easily deploy OpenClaw to your Azure environment.
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fhanhsia%2Fopenclaw-azure-deploy%2Fmain%2Fazuredeploy.json)
 
+Azure 中国区用户 / Azure China users:
+
+[![Deploy to Azure China](https://aka.ms/deploytoazurebutton)](https://portal.azure.cn/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fhanhsia%2Fopenclaw-azure-deploy%2Fmain%2Fazuredeploy.json)
+
 <a id="zh-cn"></a>
 # 中文部署指南
 
@@ -44,7 +48,7 @@ Use the button below to easily deploy OpenClaw to your Azure environment.
 5. 点击**查看 + 创建**，然后点击**创建**提交部署。
 6. 等待部署完成。请耐心等待，直到所有资源（特别是扩展 `openclaw-bootstrap`）显示部署成功。
 7. 部署完成后，点击左侧的**输出 (Outputs)**，记录以下重要信息：
-   - `vmPublicFqdn` (虚拟机公网域名，用于稍后 SSH 登录)
+   - `vmPublicFqdn` (虚拟机公网域名，用于稍后 SSH 登录,你也可以查看虚拟机的的DNS 名称获得)
 
 ## 3. 连接与初始化配置
 
@@ -131,6 +135,12 @@ openclaw-approve-browser
 ```bash
 az login
 ```
+
+> **Azure 中国区用户：** 请先切换到 Azure China 环境再登录：
+> ```bash
+> az cloud set --name AzureChinaCloud
+> az login
+> ```
 
 ### 2. 创建资源组
 在开始部署前，先指定一个位置（例如 `southeastasia`）来创建您的资源组：
@@ -375,6 +385,12 @@ If you prefer the command line, you can skip the web-based one-click deployment 
 ```bash
 az login
 ```
+
+> **Azure China users:** Switch to the Azure China environment before signing in:
+> ```bash
+> az cloud set --name AzureChinaCloud
+> az login
+> ```
 
 ### 2. Create a resource group
 Before deployment, choose a location such as `southeastasia` and create a resource group:
