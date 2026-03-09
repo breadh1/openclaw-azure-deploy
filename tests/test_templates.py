@@ -183,6 +183,8 @@ class AzureDeployTemplateTests(unittest.TestCase):
         self.assertIn("Deploy to Azure", self.readme)
         self.assertIn("feishuAppId", self.readme)
         self.assertIn("openclaw-browser-url", self.readme)
+        self.assertIn("createUIDefinitionUri", self.readme)
+        self.assertIn("createUiDefinition.json", self.readme)
 
 
 if __name__ == "__main__":
