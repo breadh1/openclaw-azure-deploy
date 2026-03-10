@@ -127,6 +127,27 @@ class AzureDeployTemplateTests(unittest.TestCase):
             variables["feishuValidationMode"],
         )
 
+    def test_msteams_parameters_are_optional_but_paired_and_global_only(self):
+        parameters = self.template["parameters"]
+        self.assertIn("msteamsAppId", parameters)
+        self.assertIn("msteamsAppPassword", parameters)
+        self.assertEqual(parameters["msteamsAppId"]["defaultValue"], "")
+        self.assertEqual(parameters["msteamsAppPassword"]["defaultValue"], "")
+
+        variables = self.template["variables"]
+        self.assertEqual(variables["msteamsTenantId"], "[subscription().tenantId]")
+        self.assertIn("msteamsValidationMode", variables)
+        self.assertIn("msteamsAppId", variables["msteamsValidationMode"])
+        self.assertIn("msteamsAppPassword", variables["msteamsValidationMode"])
+        self.assertIn("Azure Global", variables["msteamsValidationMode"])
+
+    def test_openclaw_config_template_contains_msteams_placeholders(self):
+        channels = self.openclaw_config_template["channels"]
+        self.assertIn("msteams", channels)
+        self.assertEqual(channels["msteams"]["appId"], "${MSTEAMS_APP_ID}")
+        self.assertEqual(channels["msteams"]["appPassword"], "${MSTEAMS_APP_PASSWORD}")
+        self.assertEqual(channels["msteams"]["tenantId"], "[subscription().tenantId]")
+
     def test_feishu_channel_defaults_to_open_dm(self):
         feishu_json = self.template["variables"]["openclawFeishuJson"]
         self.assertIn('"dmPolicy": "open"', feishu_json)
@@ -150,6 +171,34 @@ class AzureDeployTemplateTests(unittest.TestCase):
         self.assertIn('FEISHU_APP_ID="$FEISHU_APP_ID"', self.bootstrap_script)
         self.assertIn('FEISHU_APP_SECRET="$FEISHU_APP_SECRET"', self.bootstrap_script)
 
+    def test_bootstrap_script_exports_msteams_credentials_and_installs_plugin(self):
+        self.assertIn("MSTEAMS_APP_ID={8}", self.bootstrap_script)
+        self.assertIn("MSTEAMS_APP_PASSWORD={9}", self.bootstrap_script)
+        self.assertIn("MSTEAMS_TENANT_ID={10}", self.bootstrap_script)
+        self.assertIn(
+            'git config --global --add url."https://github.com/".insteadOf ssh://git@github.com/',
+            self.bootstrap_script,
+        )
+        self.assertIn(
+            'git config --global --add url."https://github.com/".insteadOf git@github.com:',
+            self.bootstrap_script,
+        )
+        self.assertIn(
+            "for candidate in /opt/openclaw/tools/node-v*/bin; do",
+            self.bootstrap_script,
+        )
+        self.assertIn(
+            'ln -sf "$OPENCLAW_NODE_BIN/npm" /usr/local/bin/npm',
+            self.bootstrap_script,
+        )
+        self.assertIn('MSTEAMS_APP_ID="$MSTEAMS_APP_ID"', self.bootstrap_script)
+        self.assertIn(
+            'MSTEAMS_APP_PASSWORD="$MSTEAMS_APP_PASSWORD"', self.bootstrap_script
+        )
+        self.assertIn(
+            "openclaw plugins install @openclaw/msteams", self.bootstrap_script
+        )
+
     def test_custom_ui_contains_dedicated_feishu_step(self):
         self.assertEqual(
             self.ui_definition["$schema"],
@@ -166,7 +215,7 @@ class AzureDeployTemplateTests(unittest.TestCase):
 
         steps = self.ui_definition["parameters"]["steps"]
         step_names = [step["name"] for step in steps]
-        self.assertEqual(step_names, ["openai", "feishu"])
+        self.assertEqual(step_names, ["openai", "feishu", "teams"])
 
         feishu_step = next(step for step in steps if step["name"] == "feishu")
         element_names = [element["name"] for element in feishu_step["elements"]]
@@ -190,15 +239,33 @@ class AzureDeployTemplateTests(unittest.TestCase):
         self.assertTrue(feishu_secret["options"]["hideConfirmation"])
         self.assertEqual(feishu_secret["label"]["password"], "Feishu App Secret")
 
+        teams_step = next(step for step in steps if step["name"] == "teams")
+        teams_names = [element["name"] for element in teams_step["elements"]]
+        self.assertEqual(teams_names, ["msteamsAppId", "msteamsAppPassword"])
+
+        teams_password = next(
+            element
+            for element in teams_step["elements"]
+            if element["name"] == "msteamsAppPassword"
+        )
+        self.assertTrue(teams_password["options"]["hideConfirmation"])
+        self.assertEqual(teams_password["label"]["password"], "Bot App Password")
+
         outputs = self.ui_definition["parameters"]["outputs"]
         self.assertEqual(outputs["vmName"], "[basics('vmName')]")
         self.assertEqual(
             outputs["feishuAppSecret"], "[steps('feishu').feishuAppSecret.password]"
         )
+        self.assertEqual(outputs["msteamsAppId"], "[steps('teams').msteamsAppId]")
+        self.assertEqual(
+            outputs["msteamsAppPassword"],
+            "[steps('teams').msteamsAppPassword.password]",
+        )
 
     def test_readme_mentions_create_ui_definition_and_test_command(self):
         self.assertIn("Deploy to Azure", self.readme)
         self.assertIn("feishuAppId", self.readme)
+        self.assertIn("msteamsAppId", self.readme)
         self.assertIn("openclaw-browser-url", self.readme)
         self.assertIn("createUIDefinitionUri", self.readme)
         self.assertIn("createUiDefinition.json", self.readme)

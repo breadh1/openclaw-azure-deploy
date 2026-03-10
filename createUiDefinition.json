@@ -6,7 +6,7 @@
     "config": {
       "isWizard": true,
       "basics": {
-        "description": "Deploy OpenClaw to Azure with an optional Azure OpenAI configuration and a dedicated Feishu step.",
+        "description": "Deploy OpenClaw to Azure with optional Azure OpenAI, Feishu, and Microsoft Teams configuration. Microsoft Teams standard mode supports Azure Global only.",
         "location": {
           "resourceTypes": [
             "Microsoft.Compute/virtualMachines",
@@ -100,13 +100,13 @@
     "steps": [
       {
         "name": "openai",
-        "label": "Azure OpenAI",
+        "label": "Azure OpenAI (Recommended)",
         "elements": [
           {
             "name": "azureOpenAiEndpoint",
             "type": "Microsoft.Common.TextBox",
             "label": "Endpoint",
-            "toolTip": "Optional. Fill in all three Azure OpenAI fields together, or leave all three empty.",
+            "toolTip": "Fill in all three Azure OpenAI fields together, or leave all three empty.",
             "defaultValue": "",
             "constraints": {
               "required": false
@@ -116,7 +116,7 @@
             "name": "azureOpenAiDeployment",
             "type": "Microsoft.Common.TextBox",
             "label": "Deployment Name",
-            "toolTip": "Optional Azure OpenAI deployment name used by OpenClaw as the primary model ref.",
+            "toolTip": "Azure OpenAI deployment name used by OpenClaw as the primary model ref.",
             "defaultValue": "",
             "constraints": {
               "required": false
@@ -129,7 +129,7 @@
               "password": "API Key",
               "confirmPassword": "Confirm API Key"
             },
-            "toolTip": "Optional API key for the Azure OpenAI resource.",
+            "toolTip": "API key for the Azure OpenAI resource.",
             "options": {
               "hideConfirmation": true
             },
@@ -141,7 +141,7 @@
       },
       {
         "name": "feishu",
-        "label": "Feishu",
+        "label": "Feishu (Optional)",
         "elements": [
           {
             "name": "feishuAppId",
@@ -160,7 +160,38 @@
               "password": "Feishu App Secret",
               "confirmPassword": "Confirm Feishu App Secret"
             },
-            "toolTip": "Optional Feishu App Secret for WebSocket bot integration.",
+            "toolTip": "Optional Feishu App Secret.",
+            "options": {
+              "hideConfirmation": true
+            },
+            "constraints": {
+              "required": false
+            }
+          }
+        ]
+      },
+      {
+        "name": "teams",
+        "label": "Microsoft Teams (Optional)",
+        "elements": [
+          {
+            "name": "msteamsAppId",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Bot App ID",
+            "toolTip": "Optional. Fill in both Teams fields together, or leave both empty. Standard mode uses the current Azure tenant automatically. Azure Global only.",
+            "defaultValue": "",
+            "constraints": {
+              "required": false
+            }
+          },
+          {
+            "name": "msteamsAppPassword",
+            "type": "Microsoft.Common.PasswordBox",
+            "label": {
+              "password": "Bot App Password",
+              "confirmPassword": "Confirm Bot App Password"
+            },
+            "toolTip": "Optional Microsoft Teams Bot App Password for standard mode.",
             "options": {
               "hideConfirmation": true
             },
@@ -182,7 +213,9 @@
       "azureOpenAiDeployment": "[steps('openai').azureOpenAiDeployment]",
       "azureOpenAiApiKey": "[steps('openai').azureOpenAiApiKey.password]",
       "feishuAppId": "[steps('feishu').feishuAppId]",
-      "feishuAppSecret": "[steps('feishu').feishuAppSecret.password]"
+      "feishuAppSecret": "[steps('feishu').feishuAppSecret.password]",
+      "msteamsAppId": "[steps('teams').msteamsAppId]",
+      "msteamsAppPassword": "[steps('teams').msteamsAppPassword.password]"
     }
   }
 }

@@ -1,6 +1,10 @@
 import json
 import os
+import shutil
 import subprocess
+import sys
+import threading
+import time
 import unittest
 import uuid
 from pathlib import Path
@@ -15,6 +19,42 @@ CHINA_CLOUD = "AzureChinaCloud"
 CHINA_LOCATION = "chinanorth3"
 DEFAULT_ADMIN_USERNAME = "azureuser"
 DEFAULT_HOSTNAME = ""
+DELETE_WAIT_TIMEOUT_SECONDS = 300
+DELETE_WAIT_POLL_SECONDS = 15
+SENSITIVE_PARAMETER_KEYS = {
+    "azureOpenAiApiKey",
+    "feishuAppSecret",
+    "msteamsAppPassword",
+    "sshPublicKey",
+}
+AZ_EXECUTABLE = shutil.which("az.cmd") or shutil.which("az") or "az"
+
+
+def log_message(cloud_name, message):
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] [{cloud_name}] {message}", flush=True)
+
+
+def sanitize_az_args(args):
+    sanitized = []
+    for arg in args:
+        if "=" in arg:
+            key, value = arg.split("=", 1)
+            if key in SENSITIVE_PARAMETER_KEYS and value:
+                sanitized.append(f"{key}=***")
+                continue
+        sanitized.append(arg)
+    return sanitized
+
+
+def stream_reader(pipe, sink, prefix, buffer):
+    try:
+        for line in iter(pipe.readline, ""):
+            buffer.append(line)
+            sink.write(f"{prefix}{line}")
+            sink.flush()
+    finally:
+        pipe.close()
 
 
 def load_env(relative_path: str):
@@ -31,20 +71,45 @@ def load_env(relative_path: str):
 
 
 def run_az(args, cloud_name):
-    command = subprocess.list2cmdline(["az", *args])
-    completed = subprocess.run(
+    command = [AZ_EXECUTABLE, *args]
+    pretty_command = subprocess.list2cmdline(["az", *sanitize_az_args(args)])
+    log_message(cloud_name, f"Running az command: {pretty_command}")
+
+    process = subprocess.Popen(
         command,
         cwd=REPO_ROOT,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        shell=True,
         env={**os.environ, "AZURE_CORE_CLOUD": cloud_name},
     )
-    if completed.returncode != 0:
+
+    stdout_buffer = []
+    stderr_buffer = []
+    stdout_thread = threading.Thread(
+        target=stream_reader,
+        args=(process.stdout, sys.stdout, f"[{cloud_name}][stdout] ", stdout_buffer),
+        daemon=True,
+    )
+    stderr_thread = threading.Thread(
+        target=stream_reader,
+        args=(process.stderr, sys.stderr, f"[{cloud_name}][stderr] ", stderr_buffer),
+        daemon=True,
+    )
+    stdout_thread.start()
+    stderr_thread.start()
+    return_code = process.wait()
+    stdout_thread.join()
+    stderr_thread.join()
+
+    stdout_text = "".join(stdout_buffer)
+    stderr_text = "".join(stderr_buffer)
+    if return_code != 0:
         raise RuntimeError(
-            f"az {' '.join(args)} failed for {cloud_name}\nstdout:\n{completed.stdout}\nstderr:\n{completed.stderr}"
+            f"az {' '.join(sanitize_az_args(args))} failed for {cloud_name}\nstdout:\n{stdout_text}\nstderr:\n{stderr_text}"
         )
-    return completed.stdout
+    log_message(cloud_name, f"Completed az command: {pretty_command}")
+    return stdout_text
 
 
 def ensure_cloud(cloud_name):
@@ -65,6 +130,33 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
     def setUpClass(cls):
         cls.env = load_env(".env")
 
+    def _log(self, cloud_name, message):
+        log_message(cloud_name, message)
+
+    def _wait_for_resource_group_deletion(self, cloud_name, resource_group_name):
+        deadline = time.time() + DELETE_WAIT_TIMEOUT_SECONDS
+        while True:
+            exists_output = run_az(
+                ["group", "exists", "--name", resource_group_name],
+                cloud_name,
+            )
+            exists = exists_output.strip().lower() == "true"
+            if not exists:
+                self._log(cloud_name, f"Resource group {resource_group_name} deleted")
+                return
+
+            remaining_seconds = max(0, int(deadline - time.time()))
+            if remaining_seconds == 0:
+                self.fail(
+                    f"Timed out waiting {DELETE_WAIT_TIMEOUT_SECONDS}s for resource group {resource_group_name} deletion in {cloud_name}."
+                )
+
+            self._log(
+                cloud_name,
+                f"Resource group {resource_group_name} still exists; waiting {DELETE_WAIT_POLL_SECONDS}s more ({remaining_seconds}s remaining)",
+            )
+            time.sleep(DELETE_WAIT_POLL_SECONDS)
+
     def setUp(self):
         if self.env.get("TEST_RUN_INTEGRATION", "0") != "1":
             self.skipTest(
@@ -76,12 +168,16 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
             )
 
     def _deploy_and_cleanup(self, cloud_name, location, subscription_id_env_key):
+        self._log(cloud_name, "Checking Azure CLI login state")
         if not is_logged_in(cloud_name):
             self.skipTest(f"Azure CLI is not logged in for {cloud_name}.")
+        self._log(cloud_name, "Azure CLI login verified")
 
         subscription_id = self.env.get(subscription_id_env_key, "").strip()
         if subscription_id:
+            self._log(cloud_name, f"Selecting subscription {subscription_id}")
             run_az(["account", "set", "--subscription", subscription_id], cloud_name)
+            self._log(cloud_name, "Subscription selected")
 
         suffix = uuid.uuid4().hex[:8]
         resource_group_prefix = (
@@ -109,6 +205,18 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
                 ]
             )
 
+        if (
+            cloud_name == GLOBAL_CLOUD
+            and self.env.get("TEST_MSTEAMS_APP_ID")
+            and self.env.get("TEST_MSTEAMS_APP_PASSWORD")
+        ):
+            parameters.extend(
+                [
+                    f"msteamsAppId={self.env['TEST_MSTEAMS_APP_ID']}",
+                    f"msteamsAppPassword={self.env['TEST_MSTEAMS_APP_PASSWORD']}",
+                ]
+            )
+
         openai_values = [
             self.env.get("TEST_AZURE_OPENAI_ENDPOINT", "").strip(),
             self.env.get("TEST_AZURE_OPENAI_DEPLOYMENT", "").strip(),
@@ -124,6 +232,10 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
             )
 
         try:
+            self._log(
+                cloud_name,
+                f"Creating resource group {resource_group_name} in {location}",
+            )
             ensure_cloud(cloud_name)
             run_az(
                 [
@@ -139,8 +251,13 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
                 cloud_name,
             )
             rg_created = True
+            self._log(cloud_name, f"Resource group {resource_group_name} created")
 
             deployment_name = f"deploy-{suffix}"
+            self._log(
+                cloud_name,
+                f"Starting deployment {deployment_name} for VM {vm_name}",
+            )
             deployment_output = run_az(
                 [
                     "deployment",
@@ -159,11 +276,16 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
                 ],
                 cloud_name,
             )
+            self._log(cloud_name, f"Deployment {deployment_name} completed")
 
             payload = json.loads(deployment_output)
             outputs = payload["properties"]["outputs"]
             vm_public_fqdn = outputs["vmPublicFqdn"]["value"]
             openclaw_public_url = outputs["openclawPublicUrl"]["value"]
+            self._log(
+                cloud_name,
+                f"Validating outputs for {vm_public_fqdn} and {openclaw_public_url}",
+            )
 
             expected_suffix = (
                 ".cloudapp.chinacloudapi.cn"
@@ -173,8 +295,34 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
             self.assertTrue(vm_public_fqdn.endswith(expected_suffix))
             self.assertTrue(openclaw_public_url.startswith("https://"))
             self.assertIn(vm_name, vm_public_fqdn)
+
+            if cloud_name == GLOBAL_CLOUD and self.env.get("TEST_MSTEAMS_APP_ID"):
+                bot_name = f"{vm_name}-bot"
+                self._log(cloud_name, f"Checking Teams bot resource {bot_name}")
+                bot_show = json.loads(
+                    run_az(
+                        [
+                            "resource",
+                            "show",
+                            "--resource-group",
+                            resource_group_name,
+                            "--resource-type",
+                            "Microsoft.BotService/botServices",
+                            "--name",
+                            bot_name,
+                            "--output",
+                            "json",
+                        ],
+                        cloud_name,
+                    )
+                )
+                self.assertEqual(bot_show["name"], bot_name)
+                self._log(cloud_name, f"Teams bot resource {bot_name} verified")
+
+            self._log(cloud_name, "Deployment validation finished")
         finally:
             if rg_created:
+                self._log(cloud_name, f"Deleting resource group {resource_group_name}")
                 ensure_cloud(cloud_name)
                 run_az(
                     [
@@ -187,18 +335,11 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
                     ],
                     cloud_name,
                 )
-                run_az(
-                    [
-                        "group",
-                        "wait",
-                        "--deleted",
-                        "--name",
-                        resource_group_name,
-                        "--timeout",
-                        "1800",
-                    ],
+                self._log(
                     cloud_name,
+                    f"Waiting for resource group {resource_group_name} deletion",
                 )
+                self._wait_for_resource_group_deletion(cloud_name, resource_group_name)
 
     def test_real_deploy_global_azure(self):
         self._deploy_and_cleanup(

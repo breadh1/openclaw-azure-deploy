@@ -36,6 +36,15 @@ Azure 中国区用户 / Azure China users:
 
 这两个飞书参数要么全部填写，要么全部留空。
 
+如果您希望部署完成后立即接入 Microsoft Teams（标准模式），请先准备以下信息：
+
+- **Teams Bot App ID**：您在 Microsoft Entra / Azure Bot 中使用的应用 ID
+- **Teams Bot App Password**：对应应用的客户端密钥值
+
+Teams 标准模式当前仅支持 **Azure Global**，不支持 **Azure China**。模板会自动使用当前 Azure tenant 作为 Teams 所需的 tenant ID，因此您无需手动填写 tenant ID。
+
+这两个 Teams 参数要么全部填写，要么全部留空。
+
 如果你还没有 SSH 密钥对，可以参考下方操作系统的具体说明进行生成。
 
 ## 2. 一键部署流程
@@ -53,8 +62,11 @@ Azure 中国区用户 / Azure China users:
   - `azureOpenAiApiKey`：可选，您的 Azure OpenAI API 密钥
   - `feishuAppId`：可选，飞书应用的 App ID
   - `feishuAppSecret`：可选，飞书应用的 App Secret
+  - `msteamsAppId`：可选，Microsoft Teams Bot App ID，仅支持 Azure Global
+  - `msteamsAppPassword`：可选，Microsoft Teams Bot App Password，仅支持 Azure Global
   - 上述三个 Azure OpenAI 参数要么全部填写，要么全部留空
   - 上述两个飞书参数要么全部填写，要么全部留空
+  - 上述两个 Teams 参数要么全部填写，要么全部留空；tenant ID 由模板自动取当前 Azure tenant
 5. 点击**查看 + 创建**，然后点击**创建**提交部署。
 6. 等待部署完成。请耐心等待，直到所有资源（特别是扩展 `openclaw-bootstrap`）显示部署成功。
 7. 部署完成后，点击左侧的**输出 (Outputs)**，记录以下重要信息：
@@ -207,6 +219,27 @@ openclaw gateway status
 sudo cat /data/openclaw.json
 ```
 
+## Microsoft Teams 配置（Azure Global）
+
+在部署表单填写 `msteamsAppId` 和 `msteamsAppPassword` 之前，请先在 Azure Global 中完成 Azure Bot / App Registration 准备。标准模式下，模板会自动使用当前 Azure tenant 作为 Teams 所需 tenant ID，因此无需单独填写 tenant ID。
+
+1. 在 Azure Global 中创建 Azure Bot，并准备 Bot 使用的 App ID / App Password。
+2. 在部署表单中填写 `msteamsAppId` 和 `msteamsAppPassword`。
+3. 模板会自动：
+  - 创建 Azure Bot 资源并启用 Teams channel
+  - 在虚拟机中安装 `@openclaw/msteams` 插件
+  - 将 Teams 通道配置写入 OpenClaw
+  - 通过 Caddy 暴露 `https://<你的域名>/api/messages`
+4. 部署完成后，您仍需在 Teams 侧单独完成 Teams app manifest/package 的上传与安装。
+
+部署完成后，可在虚拟机中检查：
+
+```bash
+openclaw plugins list
+openclaw gateway status
+sudo cat /data/openclaw.json
+```
+
 ## 常见问题
 
 ### 1. SSH 报错 `Permission denied (publickey)`
@@ -313,6 +346,15 @@ If you want Feishu connected during deployment with the WebSocket long-connectio
 
 These two Feishu parameters must either both be provided or both be left empty.
 
+If you want Microsoft Teams connected during deployment in standard mode, prepare the following:
+
+- **Teams Bot App ID**: the application ID used by your Microsoft Entra / Azure Bot registration
+- **Teams Bot App Password**: the client secret value for that application
+
+Teams standard mode currently supports **Azure Global only** and does not support **Azure China**. The template automatically uses the current Azure tenant as the tenant ID required by Teams, so you do not need to enter a tenant ID manually.
+
+These two Teams parameters must either both be provided or both be left empty.
+
 If you do not have an SSH key pair yet, you can generate one by following the operating-system-specific instructions below.
 
 ## 2. One-Click Deployment Workflow
@@ -328,10 +370,13 @@ If you do not have an SSH key pair yet, you can generate one by following the op
    - `azureOpenAiEndpoint`: optional, your Azure OpenAI endpoint
    - `azureOpenAiDeployment`: optional, your Azure OpenAI deployment name
    - `azureOpenAiApiKey`: optional, your Azure OpenAI API key
-  - `feishuAppId`: optional, your Feishu app App ID
-  - `feishuAppSecret`: optional, your Feishu app App Secret
+   - `feishuAppId`: optional, your Feishu app App ID
+   - `feishuAppSecret`: optional, your Feishu app App Secret
+   - `msteamsAppId`: optional, your Microsoft Teams Bot App ID, Azure Global only
+   - `msteamsAppPassword`: optional, your Microsoft Teams Bot App Password, Azure Global only
    - The three Azure OpenAI parameters above must either all be provided or all be left empty
-  - The two Feishu parameters above must either both be provided or both be left empty
+   - The two Feishu parameters above must either both be provided or both be left empty
+   - The two Teams parameters above must either both be provided or both be left empty; the tenant ID is automatically taken from the current Azure tenant
 5. Click **Review + create**, then click **Create** to submit the deployment.
 6. Wait for deployment to finish. In particular, wait until all resources, especially the `openclaw-bootstrap` extension, show as successfully deployed.
 7. After deployment finishes, open **Outputs** on the left and record the following:
@@ -478,6 +523,27 @@ Before you enter `feishuAppId` and `feishuAppSecret` in the deployment form, com
 After deployment, you can verify the channel on the VM:
 
 ```bash
+openclaw gateway status
+sudo cat /data/openclaw.json
+```
+
+## Microsoft Teams Setup (Azure Global)
+
+Before you enter `msteamsAppId` and `msteamsAppPassword` in the deployment form, prepare your Azure Bot / App Registration in Azure Global first. In standard mode, the template automatically uses the current Azure tenant as the tenant ID required by Teams, so you do not need to enter a tenant ID separately.
+
+1. Create an Azure Bot in Azure Global and prepare the Bot App ID / App Password.
+2. Enter `msteamsAppId` and `msteamsAppPassword` in the deployment form.
+3. The template automatically:
+  - creates the Azure Bot resource and enables the Teams channel
+  - installs the `@openclaw/msteams` plugin on the VM
+  - writes the Teams channel configuration into OpenClaw
+  - exposes `https://<your-hostname>/api/messages` through Caddy
+4. After deployment, you still need to upload and install the Teams app manifest/package on the Teams side.
+
+After deployment, you can verify the setup on the VM:
+
+```bash
+openclaw plugins list
 openclaw gateway status
 sudo cat /data/openclaw.json
 ```

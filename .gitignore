@@ -4,3 +4,4 @@ openclawConfig.template.json
 .env
 tests/__pycache__/
 *.pyc
+.github/copilot-instructions.md
