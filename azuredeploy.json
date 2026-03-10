@@ -44,6 +44,13 @@
         "description": "Managed data disk size in GiB for /data."
       }
     },
+    "location": {
+      "type": "string",
+      "defaultValue": "southeastasia",
+      "metadata": {
+        "description": "Region used for Azure resources created by this template. Defaults to southeastasia and is independent from the resource group location."
+      }
+    },
     "hostname": {
       "type": "string",
       "defaultValue": "",
@@ -110,9 +117,10 @@
     "dataDiskName": "[format('{0}-data', parameters('vmName'))]",
     "dnsLabel": "[take(toLower(replace(concat(parameters('vmName'), '-', uniqueString(resourceGroup().id)), '_', '-')), 63)]",
     "openclawPort": 18789,
+    "deploymentLocation": "[if(empty(parameters('location')), resourceGroup().location, parameters('location'))]",
     "isAzureChinaCloud": "[equals(environment().name, 'AzureChinaCloud')]",
     "publicDnsSuffix": "[if(variables('isAzureChinaCloud'), 'cloudapp.chinacloudapi.cn', 'cloudapp.azure.com')]",
-    "publicFqdn": "[format('{0}.{1}.{2}', variables('dnsLabel'), resourceGroup().location, variables('publicDnsSuffix'))]",
+    "publicFqdn": "[format('{0}.{1}.{2}', variables('dnsLabel'), variables('deploymentLocation'), variables('publicDnsSuffix'))]",
     "publicOrigin": "[format('https://{0}', variables('publicFqdn'))]",
     "hostnameOrigin": "[if(empty(parameters('hostname')), '', format('https://{0}', parameters('hostname')))]",
     "publicControlUrl": "[if(empty(parameters('hostname')), format('https://{0}/', variables('publicFqdn')), format('https://{0}/', parameters('hostname')))]",
@@ -151,7 +159,7 @@
       "type": "Microsoft.Network/networkSecurityGroups",
       "apiVersion": "2024-05-01",
       "name": "[variables('nsgName')]",
-      "location": "[resourceGroup().location]",
+      "location": "[variables('deploymentLocation')]",
       "properties": {
         "securityRules": [
           {
@@ -200,7 +208,7 @@
       "type": "Microsoft.Network/publicIPAddresses",
       "apiVersion": "2024-05-01",
       "name": "[variables('publicIpName')]",
-      "location": "[resourceGroup().location]",
+      "location": "[variables('deploymentLocation')]",
       "sku": {
         "name": "Standard",
         "tier": "Regional"
@@ -217,7 +225,7 @@
       "type": "Microsoft.Network/virtualNetworks",
       "apiVersion": "2024-05-01",
       "name": "[variables('vnetName')]",
-      "location": "[resourceGroup().location]",
+      "location": "[variables('deploymentLocation')]",
       "properties": {
         "addressSpace": {
           "addressPrefixes": [
@@ -244,7 +252,7 @@
       "type": "Microsoft.Network/networkInterfaces",
       "apiVersion": "2024-05-01",
       "name": "[variables('nicName')]",
-      "location": "[resourceGroup().location]",
+      "location": "[variables('deploymentLocation')]",
       "properties": {
         "ipConfigurations": [
           {
@@ -270,7 +278,7 @@
       "type": "Microsoft.Compute/disks",
       "apiVersion": "2024-03-02",
       "name": "[variables('dataDiskName')]",
-      "location": "[resourceGroup().location]",
+      "location": "[variables('deploymentLocation')]",
       "sku": {
         "name": "StandardSSD_LRS"
       },
@@ -285,7 +293,7 @@
       "type": "Microsoft.Compute/virtualMachines",
       "apiVersion": "2024-03-01",
       "name": "[parameters('vmName')]",
-      "location": "[resourceGroup().location]",
+      "location": "[variables('deploymentLocation')]",
       "identity": {
         "type": "SystemAssigned"
       },
@@ -384,7 +392,7 @@
       "type": "Microsoft.Compute/virtualMachines/extensions",
       "apiVersion": "2024-03-01",
       "name": "[format('{0}/{1}', parameters('vmName'), 'openclaw-bootstrap')]",
-      "location": "[resourceGroup().location]",
+      "location": "[variables('deploymentLocation')]",
       "properties": {
         "publisher": "Microsoft.Azure.Extensions",
         "type": "CustomScript",

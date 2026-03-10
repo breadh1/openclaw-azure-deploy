@@ -8,6 +8,8 @@
       "basics": {
         "description": "Deploy OpenClaw to Azure with optional Azure OpenAI, Feishu, and Microsoft Teams configuration. Microsoft Teams standard mode supports Azure Global only.",
         "location": {
+          "label": "Region",
+          "toolTip": "Azure region used for both the resource group and the OpenClaw resources created by this template.",
           "resourceTypes": [
             "Microsoft.Compute/virtualMachines",
             "Microsoft.Compute/disks",
@@ -208,6 +210,7 @@
       "sshPublicKey": "[basics('sshPublicKey')]",
       "vmSize": "[basics('vmSize')]",
       "dataDiskSizeGb": "[int(basics('dataDiskSizeGb'))]",
+      "location": "[location()]",
       "hostname": "[basics('hostname')]",
       "azureOpenAiEndpoint": "[steps('openai').azureOpenAiEndpoint]",
       "azureOpenAiDeployment": "[steps('openai').azureOpenAiDeployment]",

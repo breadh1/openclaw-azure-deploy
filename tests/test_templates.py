@@ -77,9 +77,18 @@ class AzureDeployTemplateTests(unittest.TestCase):
             variables["isAzureChinaCloud"],
             "[equals(environment().name, 'AzureChinaCloud')]",
         )
+        self.assertEqual(
+            self.template["parameters"]["location"]["defaultValue"],
+            "southeastasia",
+        )
+        self.assertEqual(
+            variables["deploymentLocation"],
+            "[if(empty(parameters('location')), resourceGroup().location, parameters('location'))]",
+        )
         self.assertIn("cloudapp.chinacloudapi.cn", variables["publicDnsSuffix"])
         self.assertIn("cloudapp.azure.com", variables["publicDnsSuffix"])
         self.assertIn("variables('publicDnsSuffix')", variables["publicFqdn"])
+        self.assertIn("variables('deploymentLocation')", variables["publicFqdn"])
 
     def test_expected_global_azure_url_from_env(self):
         public_fqdn = expected_public_fqdn(
@@ -212,6 +221,12 @@ class AzureDeployTemplateTests(unittest.TestCase):
         basic_names = [element["name"] for element in basics]
         self.assertIn("vmName", basic_names)
         self.assertIn("sshPublicKey", basic_names)
+        self.assertNotIn("resourceLocation", basic_names)
+
+        location_control = self.ui_definition["parameters"]["config"]["basics"][
+            "location"
+        ]
+        self.assertEqual(location_control["label"], "Region")
 
         steps = self.ui_definition["parameters"]["steps"]
         step_names = [step["name"] for step in steps]
@@ -253,6 +268,7 @@ class AzureDeployTemplateTests(unittest.TestCase):
 
         outputs = self.ui_definition["parameters"]["outputs"]
         self.assertEqual(outputs["vmName"], "[basics('vmName')]")
+        self.assertEqual(outputs["location"], "[location()]")
         self.assertEqual(
             outputs["feishuAppSecret"], "[steps('feishu').feishuAppSecret.password]"
         )

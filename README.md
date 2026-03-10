@@ -183,6 +183,7 @@ az deployment group create \
   --template-uri https://raw.githubusercontent.com/hanhsia/openclaw-azure-deploy/main/azuredeploy.json \
   --parameters \
     vmName=openclaw-sea-20260307 \
+    location=southeastasia \
     adminUsername=azureuser \
     sshPublicKey="ssh-ed25519 AAAA..." \
     vmSize=Standard_B2as_v2 \
@@ -493,6 +494,7 @@ az deployment group create \
   --template-uri https://raw.githubusercontent.com/hanhsia/openclaw-azure-deploy/main/azuredeploy.json \
   --parameters \
     vmName=openclaw-sea-20260307 \
+    location=southeastasia \
     adminUsername=azureuser \
     sshPublicKey="ssh-ed25519 AAAA..." \
     vmSize=Standard_B2as_v2 \

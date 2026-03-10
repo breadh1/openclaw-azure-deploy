@@ -192,6 +192,7 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
             f"vmName={vm_name}",
             f"adminUsername={DEFAULT_ADMIN_USERNAME}",
             f"sshPublicKey={self.env['TEST_SSH_PUBLIC_KEY']}",
+            f"location={location}",
             f"hostname={DEFAULT_HOSTNAME}",
         ]
 
