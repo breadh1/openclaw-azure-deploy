@@ -195,7 +195,7 @@ systemctl --user restart openclaw-gateway
 
 ```bash
 curl -fsSL https://openclaw.ai/install-cli.sh | bash -s -- --prefix "$HOME/.openclaw" --node-version 24.14.0 --no-onboard
-bash -lc 'openclaw onboard --non-interactive --accept-risk --mode local --workspace /data/workspace --auth-choice skip --gateway-port "$OPENCLAW_GATEWAY_PORT" --gateway-bind loopback --gateway-auth token --gateway-token-ref-env OPENCLAW_GATEWAY_TOKEN --install-daemon --daemon-runtime node --skip-channels --skip-skills'
+bash -lc 'openclaw onboard --non-interactive --accept-risk --mode local --workspace /data/workspace --auth-choice skip --gateway-port "$OPENCLAW_GATEWAY_PORT" --gateway-bind loopback --gateway-auth token --gateway-token "$OPENCLAW_GATEWAY_TOKEN" --install-daemon --daemon-runtime node --skip-channels --skip-skills'
 bash -lc 'openclaw config validate'
 openclaw doctor
 openclaw gateway restart
@@ -539,11 +539,13 @@ If you want to rerun the installer explicitly instead, you can also run:
 
 ```bash
 curl -fsSL https://openclaw.ai/install-cli.sh | bash -s -- --prefix "$HOME/.openclaw" --node-version 24.14.0 --no-onboard
-bash -lc 'openclaw onboard --non-interactive --accept-risk --mode local --workspace /data/workspace --auth-choice skip --gateway-port "$OPENCLAW_GATEWAY_PORT" --gateway-bind loopback --gateway-auth token --gateway-token-ref-env OPENCLAW_GATEWAY_TOKEN --install-daemon --daemon-runtime node --skip-channels --skip-skills'
+bash -lc 'openclaw onboard --non-interactive --accept-risk --mode local --workspace /data/workspace --auth-choice skip --gateway-port "$OPENCLAW_GATEWAY_PORT" --gateway-bind loopback --gateway-auth token --gateway-token "$OPENCLAW_GATEWAY_TOKEN" --install-daemon --daemon-runtime node --skip-channels --skip-skills'
 bash -lc 'openclaw config validate'
 openclaw doctor
 openclaw gateway restart
 ```
+
+If you copied that command from an older README revision, replace `--gateway-token-ref-env OPENCLAW_GATEWAY_TOKEN` with `--gateway-token "$OPENCLAW_GATEWAY_TOKEN"`; otherwise the reinstall will keep writing `gateway.auth.token` as a SecretRef and reintroduce the dashboard URL and Control UI save regression.
 
 That installer writes into the administrator user's `~/.openclaw` prefix, so `sudo` is not required.
 

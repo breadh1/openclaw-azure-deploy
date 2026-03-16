@@ -380,8 +380,11 @@ class AzureDeployTemplateTests(unittest.TestCase):
             self.bootstrap_script,
         )
         self.assertIn(
-            "bash -lc 'exec /usr/local/bin/openclaw onboard --non-interactive --accept-risk --mode local --workspace /data/workspace --auth-choice skip --gateway-port \"$OPENCLAW_GATEWAY_PORT\" --gateway-bind loopback --gateway-auth token --gateway-token-ref-env OPENCLAW_GATEWAY_TOKEN --install-daemon --daemon-runtime node --skip-channels --skip-skills --json'",
+            'bash -lc \'exec /usr/local/bin/openclaw onboard --non-interactive --accept-risk --mode local --workspace /data/workspace --auth-choice skip --gateway-port "$OPENCLAW_GATEWAY_PORT" --gateway-bind loopback --gateway-auth token --gateway-token "$OPENCLAW_GATEWAY_TOKEN" --install-daemon --daemon-runtime node --skip-channels --skip-skills --json\'',
             self.bootstrap_script,
+        )
+        self.assertNotIn(
+            "--gateway-token-ref-env OPENCLAW_GATEWAY_TOKEN", self.bootstrap_script
         )
         self.assertIn(
             "run_openclaw_config_json gateway.controlUi.enabled true",

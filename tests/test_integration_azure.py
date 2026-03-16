@@ -272,9 +272,15 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
                 '&& printf "config_path=%s\\n" "$OPENCLAW_CONFIG_PATH" '
                 '&& printf "compile_cache=%s\\n" "$NODE_COMPILE_CACHE" '
                 '&& printf "no_respawn=%s\\n" "$OPENCLAW_NO_RESPAWN" '
+                '&& config_token_kind="$(python3 - <<'
+                "PY"
+                '\nimport json\nfrom pathlib import Path\nconfig = json.loads(Path.home().joinpath(".openclaw", "openclaw.json").read_text(encoding="utf-8"))\ntoken = (((config.get("gateway") or {}).get("auth") or {}).get("token"))\nprint("string" if isinstance(token, str) and token else type(token).__name__)\nPY\n)" '
+                '&& printf "config_token_kind=%s\\n" "$config_token_kind" '
                 '&& install_package_dir="/home/{user}/.openclaw/lib/node_modules/openclaw" '
                 '&& printf "install_package_dir=%s\\n" "$install_package_dir" '
-                '&& gateway_entrypoint="$(sed -n "s/^ExecStart=//p" "$HOME/.config/systemd/user/openclaw-gateway.service" | head -n 1 | awk ''{{print $2}}'')" '
+                '&& gateway_entrypoint="$(sed -n "s/^ExecStart=//p" "$HOME/.config/systemd/user/openclaw-gateway.service" | head -n 1 | awk '
+                "{{print $2}}"
+                ')" '
                 '&& printf "gateway_entrypoint=%s\\n" "$gateway_entrypoint" '
                 '&& gateway_package_dir="$(dirname "$(dirname "$gateway_entrypoint")")" '
                 '&& printf "gateway_package_dir=%s\\n" "$gateway_package_dir" '
@@ -316,6 +322,7 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
             f"/home/{DEFAULT_ADMIN_USERNAME}/.openclaw/cache/node-compile",
         )
         self.assertEqual(values.get("no_respawn"), "1")
+        self.assertEqual(values.get("config_token_kind"), "string")
         self.assertEqual(
             values.get("install_package_dir"),
             f"/home/{DEFAULT_ADMIN_USERNAME}/.openclaw/lib/node_modules/openclaw",
@@ -323,7 +330,9 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
         self.assertTrue(values.get("gateway_entrypoint", "").endswith("/dist/entry.js"))
         self.assertTrue(values.get("gateway_package_dir", "").endswith("/openclaw"))
         self.assertEqual(values.get("gateway_state"), "active")
-        if self.env.get("TEST_FEISHU_APP_ID") and self.env.get("TEST_FEISHU_APP_SECRET"):
+        if self.env.get("TEST_FEISHU_APP_ID") and self.env.get(
+            "TEST_FEISHU_APP_SECRET"
+        ):
             self.assertEqual(values.get("gateway_feishu_node_sdk"), "present")
         if self.env.get("TEST_MSTEAMS_APP_ID") and self.env.get(
             "TEST_MSTEAMS_APP_PASSWORD"
@@ -359,7 +368,7 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
             "bash -lc '"
             "ok=0; fail=0; "
             "for i in $(seq 1 {attempts}); do "
-            "if /usr/local/bin/openclaw gateway call device.pair.list --json --params \"{}\" >/tmp/device-pair-list-$i.out 2>&1; then ok=$((ok+1)); else fail=$((fail+1)); fi; "
+            'if /usr/local/bin/openclaw gateway call device.pair.list --json --params "{}" >/tmp/device-pair-list-$i.out 2>&1; then ok=$((ok+1)); else fail=$((fail+1)); fi; '
             'done; printf "ok=%s fail=%s\\n" "$ok" "$fail"; '
             "for i in $(seq 1 {attempts}); do echo --- run $i ---; tail -n 12 /tmp/device-pair-list-$i.out; done'"
         ).format(attempts=attempts)
@@ -399,7 +408,9 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
         devices_stdout, devices_stderr = self._run_ssh(
             cloud_name,
             vm_public_fqdn,
-            "bash -lc '/usr/local/bin/openclaw gateway call device.pair.list --json --params " + r'"{}"' + "'",
+            "bash -lc '/usr/local/bin/openclaw gateway call device.pair.list --json --params "
+            + r'"{}"'
+            + "'",
         )
         return self._extract_json_payload(
             f"{devices_stdout}\n{devices_stderr}",
