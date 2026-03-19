@@ -220,6 +220,10 @@ class AzureDeployTemplateTests(unittest.TestCase):
             self.bootstrap_script,
         )
         self.assertIn(
+            'OPENCLAW_LOSSLESS_CLAW_SPEC="@martian-engineering/lossless-claw@0.3.0"',
+            self.bootstrap_script,
+        )
+        self.assertIn(
             "PATH=/home/{5}/.openclaw/tools/node/bin:/home/{5}/.openclaw/bin:/usr/local/bin:/usr/bin:/bin",
             self.bootstrap_script,
         )
@@ -278,6 +282,10 @@ class AzureDeployTemplateTests(unittest.TestCase):
             self.bootstrap_script,
         )
         self.assertIn(
+            'sudo -u {5} env XDG_RUNTIME_DIR="/run/user/$OPENCLAW_UID" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$OPENCLAW_UID/bus" bash -lc \'cd "$HOME" && exec /usr/local/bin/openclaw plugins install "$1" --pin\' _ "$OPENCLAW_LOSSLESS_CLAW_SPEC"',
+            self.bootstrap_script,
+        )
+        self.assertIn(
             'sudo -u {5} bash -lc \'export PATH="$HOME/.openclaw/tools/node/bin:$PATH" && "$HOME/.openclaw/tools/node/bin/npm" config set prefix "$HOME/.openclaw"\'',
             self.bootstrap_script,
         )
@@ -323,6 +331,10 @@ class AzureDeployTemplateTests(unittest.TestCase):
         )
         self.assertIn(
             'OPENCLAW_CONFIGURED_BUNDLED_EXTENSIONS="$OPENCLAW_CONFIGURED_BUNDLED_EXTENSIONS msteams"',
+            self.bootstrap_script,
+        )
+        self.assertIn(
+            "run_openclaw_config_string plugins.slots.contextEngine lossless-claw",
             self.bootstrap_script,
         )
         self.assertIn(
@@ -380,7 +392,7 @@ class AzureDeployTemplateTests(unittest.TestCase):
             self.bootstrap_script,
         )
         self.assertIn(
-            'bash -lc \'exec /usr/local/bin/openclaw onboard --non-interactive --accept-risk --mode local --workspace /data/workspace --auth-choice skip --gateway-port "$OPENCLAW_GATEWAY_PORT" --gateway-bind loopback --gateway-auth token --gateway-token "$OPENCLAW_GATEWAY_TOKEN" --install-daemon --daemon-runtime node --skip-channels --skip-skills --json\'',
+            'bash -lc \'cd "$HOME" && exec /usr/local/bin/openclaw onboard --non-interactive --accept-risk --mode local --workspace /data/workspace --auth-choice skip --gateway-port "$OPENCLAW_GATEWAY_PORT" --gateway-bind loopback --gateway-auth token --gateway-token "$OPENCLAW_GATEWAY_TOKEN" --install-daemon --daemon-runtime node --skip-channels --skip-skills --json\'',
             self.bootstrap_script,
         )
         self.assertNotIn(

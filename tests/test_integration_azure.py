@@ -284,6 +284,11 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
                 '&& printf "gateway_entrypoint=%s\\n" "$gateway_entrypoint" '
                 '&& gateway_package_dir="$(dirname "$(dirname "$gateway_entrypoint")")" '
                 '&& printf "gateway_package_dir=%s\\n" "$gateway_package_dir" '
+                '&& plugin_context_engine="$(python3 - <<'
+                "PY"
+                '\nimport json\nfrom pathlib import Path\nconfig = json.loads(Path.home().joinpath(".openclaw", "openclaw.json").read_text(encoding="utf-8"))\nprint((((config.get("plugins") or {}).get("slots") or {}).get("contextEngine")) or "")\nPY\n)" '
+                '&& printf "plugin_context_engine=%s\\n" "$plugin_context_engine" '
+                '&& if test -d "$HOME/.openclaw/extensions/lossless-claw"; then echo runtime_lossless_claw_dir=present; else echo runtime_lossless_claw_dir=missing; fi '
                 '&& if test -f "$install_package_dir/extensions/msteams/package.json"; then echo runtime_msteams_package_json=present; else echo runtime_msteams_package_json=missing; fi '
                 '&& if test -d "$install_package_dir/extensions/msteams/node_modules/@microsoft/agents-hosting"; then echo runtime_msteams_agents_hosting=present; else echo runtime_msteams_agents_hosting=missing; fi '
                 '&& if test -d "$gateway_package_dir/extensions/msteams/node_modules/@microsoft/agents-hosting"; then echo gateway_msteams_agents_hosting=present; else echo gateway_msteams_agents_hosting=missing; fi '
@@ -329,6 +334,8 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
         )
         self.assertTrue(values.get("gateway_entrypoint", "").endswith("/dist/entry.js"))
         self.assertTrue(values.get("gateway_package_dir", "").endswith("/openclaw"))
+        self.assertEqual(values.get("plugin_context_engine"), "lossless-claw")
+        self.assertEqual(values.get("runtime_lossless_claw_dir"), "present")
         self.assertEqual(values.get("gateway_state"), "active")
         if self.env.get("TEST_FEISHU_APP_ID") and self.env.get(
             "TEST_FEISHU_APP_SECRET"
@@ -846,28 +853,27 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
             extension_show = json.loads(
                 run_az(
                     [
-                        "resource",
+                        "vm",
+                        "extension",
                         "show",
                         "--resource-group",
                         resource_group_name,
-                        "--resource-type",
-                        "Microsoft.Compute/virtualMachines/extensions",
+                        "--vm-name",
+                        vm_name,
                         "--name",
-                        extension_name,
+                        "openclaw-bootstrap",
                         "--output",
                         "json",
                     ],
                     cloud_name,
                 )
             )
-            extension_provisioning_state = extension_show.get("properties", {}).get(
-                "provisioningState", ""
-            )
+            extension_provisioning_state = extension_show.get("provisioningState", "")
             deployment_metadata["bootstrapExtensionName"] = extension_name
             deployment_metadata["bootstrapExtensionProvisioningState"] = (
                 extension_provisioning_state
             )
-            self.assertEqual(extension_show["name"], extension_name)
+            self.assertEqual(extension_show["name"], "openclaw-bootstrap")
             self.assertEqual(extension_provisioning_state, "Succeeded")
             self._log(
                 cloud_name,

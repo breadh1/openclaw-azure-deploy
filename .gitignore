@@ -16,3 +16,5 @@ teams-app-package/dist/OpenClaw.zip
 generated/
 .generated-*.parameters.json
 .env.local
+.tmp-*.json
+.tmp-test-gpt54-image.mjs
