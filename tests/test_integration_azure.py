@@ -274,7 +274,7 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
                 '&& printf "no_respawn=%s\\n" "$OPENCLAW_NO_RESPAWN" '
                 '&& config_token_kind="$(python3 - <<'
                 "PY"
-                '\nimport json\nfrom pathlib import Path\nconfig = json.loads(Path.home().joinpath(".openclaw", "openclaw.json").read_text(encoding="utf-8"))\ntoken = (((config.get("gateway") or {}).get("auth") or {}).get("token"))\nprint("string" if isinstance(token, str) and token else type(token).__name__)\nPY\n)" '
+                '\nimport json\nfrom pathlib import Path\nconfig = json.loads(Path.home().joinpath(".openclaw", "openclaw.json").read_text(encoding="utf-8"))\ntoken = (((config.get("gateway") or dict()).get("auth") or dict()).get("token"))\nprint("string" if isinstance(token, str) and token else type(token).__name__)\nPY\n)" '
                 '&& printf "config_token_kind=%s\\n" "$config_token_kind" '
                 '&& install_package_dir="/home/{user}/.openclaw/lib/node_modules/openclaw" '
                 '&& printf "install_package_dir=%s\\n" "$install_package_dir" '
@@ -286,7 +286,7 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
                 '&& printf "gateway_package_dir=%s\\n" "$gateway_package_dir" '
                 '&& plugin_context_engine="$(python3 - <<'
                 "PY"
-                '\nimport json\nfrom pathlib import Path\nconfig = json.loads(Path.home().joinpath(".openclaw", "openclaw.json").read_text(encoding="utf-8"))\nprint((((config.get("plugins") or {}).get("slots") or {}).get("contextEngine")) or "")\nPY\n)" '
+                '\nimport json\nfrom pathlib import Path\nconfig = json.loads(Path.home().joinpath(".openclaw", "openclaw.json").read_text(encoding="utf-8"))\nprint((((config.get("plugins") or dict()).get("slots") or dict()).get("contextEngine")) or "")\nPY\n)" '
                 '&& printf "plugin_context_engine=%s\\n" "$plugin_context_engine" '
                 '&& if test -d "$HOME/.openclaw/extensions/lossless-claw"; then echo runtime_lossless_claw_dir=present; else echo runtime_lossless_claw_dir=missing; fi '
                 '&& if test -f "$install_package_dir/extensions/msteams/package.json"; then echo runtime_msteams_package_json=present; else echo runtime_msteams_package_json=missing; fi '
@@ -370,12 +370,64 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
         update_output = f"{update_stdout}\n{update_stderr}"
         self.assertNotIn("spawn npm ENOENT", update_output)
 
+    def _validate_runtime_local_admin_cli_state(
+        self, cloud_name, vm_public_fqdn, openclaw_public_url
+    ):
+        stdout, _ = self._run_ssh(
+            cloud_name,
+            vm_public_fqdn,
+            (
+                "bash -lc '"
+                'printf "gateway_url=%s\\n" "${OPENCLAW_GATEWAY_URL:-}" '
+                '&& printf "public_url=%s\\n" "$OPENCLAW_PUBLIC_URL" '
+                '&& printf "gateway_token_len=%s\\n" "${#OPENCLAW_GATEWAY_TOKEN}" '
+                '&& printf "gateway_auth_mode=%s\\n" "$(/usr/local/bin/openclaw config get gateway.auth.mode)" '
+                "&& echo --- health --- "
+                '&& /usr/local/bin/openclaw health --verbose | sed -n "1,12p" '
+                "'"
+            ),
+        )
+        values = {}
+        status_lines = []
+        parsing_values = True
+        for line in stdout.splitlines():
+            if parsing_values and "=" in line:
+                key, value = line.split("=", 1)
+                values[key.strip()] = value.strip()
+                continue
+            parsing_values = False
+            status_lines.append(line)
+
+        self.assertEqual(values.get("public_url"), openclaw_public_url)
+        self.assertEqual(values.get("gateway_url"), "")
+        self.assertGreater(int(values.get("gateway_token_len", "0")), 0)
+        self.assertEqual(values.get("gateway_auth_mode"), "token")
+
+        health_output = "\n".join(status_lines)
+        self.assertIn("Gateway target: ws://127.0.0.1:18789", health_output)
+        self.assertIn("Source: local loopback", health_output)
+        self.assertNotIn("pairing required", health_output.lower())
+
+    def _validate_runtime_browser_helper_output(
+        self, cloud_name, vm_public_fqdn, openclaw_public_url
+    ):
+        browser_url_stdout, browser_url_stderr = self._run_ssh(
+            cloud_name,
+            vm_public_fqdn,
+            "bash -lc 'openclaw-browser-url'",
+        )
+        dashboard_url = self._extract_dashboard_url(
+            f"{browser_url_stdout}\n{browser_url_stderr}"
+        )
+        self.assertEqual(dashboard_url.split("#", 1)[0], openclaw_public_url)
+        self.assertIn("#token=", dashboard_url)
+
     def _assert_pairing_rpc_stable(self, cloud_name, vm_public_fqdn, attempts=5):
         command = (
             "bash -lc '"
             "ok=0; fail=0; "
             "for i in $(seq 1 {attempts}); do "
-            'if /usr/local/bin/openclaw gateway call device.pair.list --json --params "{}" >/tmp/device-pair-list-$i.out 2>&1; then ok=$((ok+1)); else fail=$((fail+1)); fi; '
+            "if /usr/local/bin/openclaw devices list --json >/tmp/device-pair-list-$i.out 2>&1; then ok=$((ok+1)); else fail=$((fail+1)); fi; "
             'done; printf "ok=%s fail=%s\\n" "$ok" "$fail"; '
             "for i in $(seq 1 {attempts}); do echo --- run $i ---; tail -n 12 /tmp/device-pair-list-$i.out; done'"
         ).format(attempts=attempts)
@@ -415,13 +467,11 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
         devices_stdout, devices_stderr = self._run_ssh(
             cloud_name,
             vm_public_fqdn,
-            "bash -lc '/usr/local/bin/openclaw gateway call device.pair.list --json --params "
-            + r'"{}"'
-            + "'",
+            "bash -lc '/usr/local/bin/openclaw devices list --json'",
         )
         return self._extract_json_payload(
             f"{devices_stdout}\n{devices_stderr}",
-            "openclaw gateway call device.pair.list --json output",
+            "openclaw devices list --json output",
         )
 
     def _matching_browser_devices(self, payload, state):
@@ -837,6 +887,12 @@ class AzureIntegrationDeploymentTests(unittest.TestCase):
             self._validate_runtime_helper_script(cloud_name, vm_public_fqdn)
             self._validate_runtime_install_state(cloud_name, vm_public_fqdn)
             self._validate_runtime_doctor_and_update_state(cloud_name, vm_public_fqdn)
+            self._validate_runtime_local_admin_cli_state(
+                cloud_name, vm_public_fqdn, openclaw_public_url
+            )
+            self._validate_runtime_browser_helper_output(
+                cloud_name, vm_public_fqdn, openclaw_public_url
+            )
             self._assert_pairing_rpc_stable(cloud_name, vm_public_fqdn)
             if self._should_validate_browser_pairing():
                 self._validate_browser_pairing(cloud_name, vm_public_fqdn)

@@ -189,7 +189,17 @@ class AzureDeployTemplateTests(unittest.TestCase):
             'OPENCLAW_ORIGINAL_PATH="$PATH"\n  set -a\n  . /etc/openclaw/openclaw.env\n  set +a\n  PATH="/home/{5}/.openclaw/tools/node/bin:/home/{5}/.openclaw/bin:$OPENCLAW_ORIGINAL_PATH"\n  export PATH\n  unset OPENCLAW_ORIGINAL_PATH',
             self.bootstrap_script,
         )
+        self.assertNotIn(
+            "cat > /etc/openclaw/openclaw-shell.env <<EOF", self.bootstrap_script
+        )
         self.assertNotIn(".openclaw-env.sh", self.bootstrap_script)
+        self.assertNotIn("OPENCLAW_GATEWAY_URL", self.bootstrap_script)
+
+    def test_bootstrap_script_trusts_loopback_reverse_proxy(self):
+        self.assertIn(
+            'run_openclaw_config_json gateway.trustedProxies \'["127.0.0.1","::1"]\'',
+            self.bootstrap_script,
+        )
 
     def test_bootstrap_script_exports_msteams_credentials_and_installs_bundled_dependencies(
         self,
@@ -278,15 +288,27 @@ class AzureDeployTemplateTests(unittest.TestCase):
             self.bootstrap_script,
         )
         self.assertIn(
-            'sudo -u {5} bash -lc \'cd "$HOME" && curl -fsSL --proto "=https" --tlsv1.2 https://openclaw.ai/install-cli.sh | bash -s -- --prefix "$HOME/.openclaw" --node-version "$1" --no-onboard --json\' _ "$OPENCLAW_NODE_VERSION"',
+            "run_admin_bash() {",
             self.bootstrap_script,
         )
         self.assertIn(
-            'sudo -u {5} env XDG_RUNTIME_DIR="/run/user/$OPENCLAW_UID" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$OPENCLAW_UID/bus" bash -lc \'cd "$HOME" && exec /usr/local/bin/openclaw plugins install "$1" --pin\' _ "$OPENCLAW_LOSSLESS_CLAW_SPEC"',
+            "bash -c 'set -a; . /etc/openclaw/openclaw.env; set +a; \"$@\"' _ bash -c",
             self.bootstrap_script,
         )
         self.assertIn(
-            'sudo -u {5} bash -lc \'export PATH="$HOME/.openclaw/tools/node/bin:$PATH" && "$HOME/.openclaw/tools/node/bin/npm" config set prefix "$HOME/.openclaw"\'',
+            "run_admin_bus_bash() {",
+            self.bootstrap_script,
+        )
+        self.assertIn(
+            'run_admin_bash \'cd "$HOME" && curl -fsSL --proto "=https" --tlsv1.2 https://openclaw.ai/install-cli.sh | bash -s -- --prefix "$HOME/.openclaw" --node-version "$1" --no-onboard --json\' "$OPENCLAW_NODE_VERSION"',
+            self.bootstrap_script,
+        )
+        self.assertIn(
+            'run_admin_bus_bash \'cd "$HOME" && exec /usr/local/bin/openclaw plugins install "$1" --pin\' "$OPENCLAW_LOSSLESS_CLAW_SPEC"',
+            self.bootstrap_script,
+        )
+        self.assertIn(
+            'run_admin_bash \'export PATH="$HOME/.openclaw/tools/node/bin:$PATH" && "$HOME/.openclaw/tools/node/bin/npm" config set prefix "$HOME/.openclaw"\'',
             self.bootstrap_script,
         )
         self.assertIn(
@@ -322,7 +344,7 @@ class AzureDeployTemplateTests(unittest.TestCase):
             self.bootstrap_script,
         )
         self.assertIn(
-            'sudo -u {5} bash -lc \'export PATH="$(dirname "$1"):$PATH" && "$1" install --omit=dev --prefix "$2"\' _ "$OPENCLAW_NPM_BIN" "$extension_dir"',
+            'run_admin_bash \'export PATH="$(dirname "$1"):$PATH" && "$1" install --omit=dev --prefix "$2"\' "$OPENCLAW_NPM_BIN" "$extension_dir"',
             self.bootstrap_script,
         )
         self.assertIn(
@@ -388,11 +410,15 @@ class AzureDeployTemplateTests(unittest.TestCase):
             self.bootstrap_script,
         )
         self.assertIn(
-            "bash -lc 'systemctl --user import-environment HOME OPENCLAW_STATE_DIR OPENCLAW_CONFIG_PATH OPENCLAW_GATEWAY_PORT OPENCLAW_GATEWAY_TOKEN OPENCLAW_PUBLIC_URL PATH NODE_COMPILE_CACHE OPENCLAW_NO_RESPAWN'",
+            "run_admin_bus_bash '. /etc/openclaw/openclaw.env && systemctl --user import-environment HOME OPENCLAW_STATE_DIR OPENCLAW_CONFIG_PATH OPENCLAW_GATEWAY_PORT OPENCLAW_GATEWAY_TOKEN OPENCLAW_PUBLIC_URL PATH NODE_COMPILE_CACHE OPENCLAW_NO_RESPAWN'",
+            self.bootstrap_script,
+        )
+        self.assertNotIn(
+            "systemctl --user import-environment HOME OPENCLAW_STATE_DIR OPENCLAW_CONFIG_PATH OPENCLAW_GATEWAY_PORT OPENCLAW_GATEWAY_TOKEN OPENCLAW_PUBLIC_URL OPENCLAW_GATEWAY_URL PATH NODE_COMPILE_CACHE OPENCLAW_NO_RESPAWN",
             self.bootstrap_script,
         )
         self.assertIn(
-            'bash -lc \'cd "$HOME" && exec /usr/local/bin/openclaw onboard --non-interactive --accept-risk --mode local --workspace /data/workspace --auth-choice skip --gateway-port "$OPENCLAW_GATEWAY_PORT" --gateway-bind loopback --gateway-auth token --gateway-token "$OPENCLAW_GATEWAY_TOKEN" --install-daemon --daemon-runtime node --skip-channels --skip-skills --json\'',
+            'run_admin_bus_bash \'. /etc/openclaw/openclaw.env && cd "$HOME" && exec /usr/local/bin/openclaw onboard --non-interactive --accept-risk --mode local --workspace /data/workspace --auth-choice skip --gateway-port "$OPENCLAW_GATEWAY_PORT" --gateway-bind loopback --gateway-auth token --gateway-token "$OPENCLAW_GATEWAY_TOKEN" --install-daemon --daemon-runtime node --skip-channels --skip-skills --json\'',
             self.bootstrap_script,
         )
         self.assertNotIn(
@@ -404,6 +430,14 @@ class AzureDeployTemplateTests(unittest.TestCase):
         )
         self.assertIn(
             'run_openclaw_config_json gateway.controlUi.allowedOrigins "$OPENCLAW_ALLOWED_ORIGINS_JSON"',
+            self.bootstrap_script,
+        )
+        self.assertIn(
+            'run_admin_bus_bash \'. /etc/openclaw/openclaw.env && cd "$HOME" && exec /usr/local/bin/openclaw config set "$1" "$2" --strict-json\'',
+            self.bootstrap_script,
+        )
+        self.assertIn(
+            'chmod 600 "/home/{5}/.openclaw/openclaw.json"',
             self.bootstrap_script,
         )
         self.assertIn(
