@@ -116,7 +116,7 @@
             "constraints": {
               "required": true,
               "allowedValues": [
-                { "label": "None (Skip Azure OpenAI)", "value": "" },
+                { "label": "None (Skip Azure OpenAI)", "value": "none" },
                 { "label": "API Key", "value": "key" },
                 { "label": "Managed Identity (Entra ID)", "value": "managedIdentity" }
               ]
@@ -128,9 +128,9 @@
             "label": "Endpoint",
             "toolTip": "Azure OpenAI resource endpoint, for example https://myresource.openai.azure.com.",
             "defaultValue": "",
-            "visible": "[not(empty(steps('openai').azureOpenAiAuthMode))]",
+            "visible": "[not(equals(steps('openai').azureOpenAiAuthMode, 'none'))]",
             "constraints": {
-              "required": "[not(empty(steps('openai').azureOpenAiAuthMode))]"
+              "required": "[not(equals(steps('openai').azureOpenAiAuthMode, 'none'))]"
             }
           },
           {
@@ -139,9 +139,9 @@
             "label": "Deployment Name",
             "toolTip": "Azure OpenAI deployment name used by OpenClaw as the primary model ref.",
             "defaultValue": "",
-            "visible": "[not(empty(steps('openai').azureOpenAiAuthMode))]",
+            "visible": "[not(equals(steps('openai').azureOpenAiAuthMode, 'none'))]",
             "constraints": {
-              "required": "[not(empty(steps('openai').azureOpenAiAuthMode))]"
+              "required": "[not(equals(steps('openai').azureOpenAiAuthMode, 'none'))]"
             }
           },
           {

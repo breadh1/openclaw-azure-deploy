@@ -60,14 +60,14 @@
     },
     "azureOpenAiAuthMode": {
       "type": "string",
-      "defaultValue": "",
+      "defaultValue": "none",
       "allowedValues": [
-        "",
+        "none",
         "key",
         "managedIdentity"
       ],
       "metadata": {
-        "description": "Authentication mode for Azure OpenAI. 'key' uses an API key, 'managedIdentity' uses the VM system-assigned managed identity with Entra ID. Leave empty to skip Azure OpenAI setup."
+        "description": "Authentication mode for Azure OpenAI. 'key' uses an API key, 'managedIdentity' uses the VM system-assigned managed identity with Entra ID. 'none' or empty to skip Azure OpenAI setup."
       }
     },
     "azureOpenAiEndpoint": {
@@ -147,7 +147,7 @@
     "msteamsPort": 3978,
     "msteamsWebhookUrl": "[if(empty(parameters('hostname')), format('https://{0}{1}', variables('publicFqdn'), variables('msteamsWebhookPath')), format('https://{0}{1}', parameters('hostname'), variables('msteamsWebhookPath')))]",
     "allowedOriginsJson": "[if(empty(parameters('hostname')), concat('[\"', variables('publicOrigin'), '\"]'), concat('[\"', variables('publicOrigin'), '\",\"', variables('hostnameOrigin'), '\"]'))]",
-    "azureOpenAiEffectiveAuthMode": "[if(not(empty(parameters('azureOpenAiAuthMode'))), parameters('azureOpenAiAuthMode'), if(and(not(empty(parameters('azureOpenAiEndpoint'))), not(empty(parameters('azureOpenAiDeployment'))), not(empty(parameters('azureOpenAiApiKey')))), 'key', ''))]",
+    "azureOpenAiEffectiveAuthMode": "[if(and(not(empty(parameters('azureOpenAiAuthMode'))), not(equals(parameters('azureOpenAiAuthMode'), 'none'))), parameters('azureOpenAiAuthMode'), if(and(not(empty(parameters('azureOpenAiEndpoint'))), not(empty(parameters('azureOpenAiDeployment'))), not(empty(parameters('azureOpenAiApiKey')))), 'key', ''))]",
     "azureOpenAiValidationMode": "[if(empty(variables('azureOpenAiEffectiveAuthMode')), if(and(empty(parameters('azureOpenAiEndpoint')), empty(parameters('azureOpenAiDeployment')), empty(parameters('azureOpenAiApiKey'))), 'disabled', string(int('When azureOpenAiAuthMode is not set, azureOpenAiEndpoint, azureOpenAiDeployment, and azureOpenAiApiKey must either all be provided or all be empty.'))), if(equals(variables('azureOpenAiEffectiveAuthMode'), 'key'), if(and(not(empty(parameters('azureOpenAiEndpoint'))), not(empty(parameters('azureOpenAiDeployment'))), not(empty(parameters('azureOpenAiApiKey')))), 'enabled', string(int('azureOpenAiAuthMode key requires azureOpenAiEndpoint, azureOpenAiDeployment, and azureOpenAiApiKey.'))), if(and(not(empty(parameters('azureOpenAiEndpoint'))), not(empty(parameters('azureOpenAiDeployment')))), 'enabled', string(int('azureOpenAiAuthMode managedIdentity requires azureOpenAiEndpoint and azureOpenAiDeployment.')))))]",
     "hasAzureOpenAiConfig": "[equals(variables('azureOpenAiValidationMode'), 'enabled')]",
     "isManagedIdentityAuth": "[equals(variables('azureOpenAiEffectiveAuthMode'), 'managedIdentity')]",

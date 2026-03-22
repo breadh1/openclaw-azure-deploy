@@ -775,10 +775,10 @@ class AzureDeployTemplateTests(unittest.TestCase):
         parameters = self.template["parameters"]
         self.assertIn("azureOpenAiAuthMode", parameters)
         self.assertEqual(parameters["azureOpenAiAuthMode"]["type"], "string")
-        self.assertEqual(parameters["azureOpenAiAuthMode"]["defaultValue"], "")
+        self.assertEqual(parameters["azureOpenAiAuthMode"]["defaultValue"], "none")
         self.assertEqual(
             sorted(parameters["azureOpenAiAuthMode"]["allowedValues"]),
-            ["", "key", "managedIdentity"],
+            ["key", "managedIdentity", "none"],
         )
 
     def test_azure_openai_effective_auth_mode_variable_exists(self):
@@ -914,7 +914,7 @@ class AzureDeployTemplateTests(unittest.TestCase):
         allowed_values = [
             v["value"] for v in auth_mode_element["constraints"]["allowedValues"]
         ]
-        self.assertEqual(sorted(allowed_values), ["", "key", "managedIdentity"])
+        self.assertEqual(sorted(allowed_values), ["key", "managedIdentity", "none"])
 
         rg_element = next(
             e
