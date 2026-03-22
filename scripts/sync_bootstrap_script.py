@@ -36,7 +36,7 @@ ARM_PLACEHOLDER_RE = re.compile(r"\{(1[0-3]|[0-9])\}")
 
 def _arm_format_arguments() -> str:
     return (
-        ", string(variables('openclawPort')), parameters('azureOpenAiApiKey'), ''"
+        ", string(variables('openclawPort')), parameters('azureOpenAiApiKey'), parameters('azureOpenAiAuthMode')"
         ", variables('caddyConfigBase64'), variables('publicControlUrl')"
         ", parameters('adminUsername'), parameters('feishuAppId')"
         ", parameters('feishuAppSecret'), parameters('msteamsAppId')"

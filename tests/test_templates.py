@@ -771,6 +771,151 @@ class AzureDeployTemplateTests(unittest.TestCase):
             "[if(variables('hasMsTeamsConfig'), variables('botServiceName'), '')]",
         )
 
+    def test_azure_openai_auth_mode_parameter_exists(self):
+        parameters = self.template["parameters"]
+        self.assertIn("azureOpenAiAuthMode", parameters)
+        self.assertEqual(parameters["azureOpenAiAuthMode"]["type"], "string")
+        self.assertEqual(parameters["azureOpenAiAuthMode"]["defaultValue"], "")
+        self.assertEqual(
+            sorted(parameters["azureOpenAiAuthMode"]["allowedValues"]),
+            ["", "key", "managedIdentity"],
+        )
+
+    def test_azure_openai_effective_auth_mode_variable_exists(self):
+        variables = self.template["variables"]
+        self.assertIn("azureOpenAiEffectiveAuthMode", variables)
+        self.assertIn(
+            "parameters('azureOpenAiAuthMode')",
+            variables["azureOpenAiEffectiveAuthMode"],
+        )
+        self.assertIn("isManagedIdentityAuth", variables)
+        self.assertIn("managedIdentity", variables["isManagedIdentityAuth"])
+        self.assertIn("azureOpenAiResourceName", variables)
+        self.assertIn("resolvedAzureOpenAiResourceGroup", variables)
+        self.assertIn("cognitiveServicesOpenAiUserRoleId", variables)
+        self.assertEqual(
+            variables["cognitiveServicesOpenAiUserRoleId"],
+            "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd",
+        )
+        self.assertIn("roleAssignmentName", variables)
+
+    def test_azure_openai_validation_supports_managed_identity(self):
+        variables = self.template["variables"]
+        validation = variables["azureOpenAiValidationMode"]
+        self.assertIn("azureOpenAiAuthMode", validation)
+        self.assertIn("managedIdentity", validation)
+        self.assertIn(
+            "azureOpenAiEndpoint",
+            validation,
+        )
+
+    def test_template_outputs_include_vm_principal_id_and_auth_mode(self):
+        outputs = self.template["outputs"]
+        self.assertIn("vmPrincipalId", outputs)
+        self.assertEqual(outputs["vmPrincipalId"]["type"], "string")
+        self.assertIn("identity.principalId", outputs["vmPrincipalId"]["value"])
+        self.assertIn("azureOpenAiAuthMode", outputs)
+        self.assertEqual(outputs["azureOpenAiAuthMode"]["type"], "string")
+        self.assertIn("azureOpenAiRoleAssignmentHint", outputs)
+        self.assertEqual(outputs["azureOpenAiRoleAssignmentHint"]["type"], "string")
+        self.assertIn(
+            "Cognitive Services OpenAI User",
+            outputs["azureOpenAiRoleAssignmentHint"]["value"],
+        )
+
+    def test_vm_has_system_assigned_identity(self):
+        vm_resources = [
+            r
+            for r in self.template["resources"]
+            if r["type"] == "Microsoft.Compute/virtualMachines"
+        ]
+        self.assertEqual(len(vm_resources), 1)
+        self.assertEqual(vm_resources[0]["identity"]["type"], "SystemAssigned")
+
+    def test_managed_identity_role_assignment_resource_exists(self):
+        role_assignment_deployments = [
+            r
+            for r in self.template["resources"]
+            if r["type"] == "Microsoft.Resources/deployments"
+            and r["name"] == "azureOpenAiRoleAssignment"
+        ]
+        self.assertEqual(len(role_assignment_deployments), 1)
+        deployment = role_assignment_deployments[0]
+        self.assertEqual(
+            deployment["condition"], "[variables('isManagedIdentityAuth')]"
+        )
+        self.assertIn(
+            "resolvedAzureOpenAiResourceGroup",
+            deployment["resourceGroup"],
+        )
+        inner_resources = deployment["properties"]["template"]["resources"]
+        self.assertEqual(len(inner_resources), 1)
+        ra = inner_resources[0]
+        self.assertEqual(ra["type"], "Microsoft.Authorization/roleAssignments")
+        self.assertIn("CognitiveServices/accounts", ra["scope"])
+        self.assertIn(
+            "cognitiveServicesOpenAiUserRoleId",
+            ra["properties"]["roleDefinitionId"],
+        )
+        self.assertEqual(ra["properties"]["principalType"], "ServicePrincipal")
+
+    def test_azure_openai_resource_group_parameter_exists(self):
+        parameters = self.template["parameters"]
+        self.assertIn("azureOpenAiResourceGroup", parameters)
+        self.assertEqual(parameters["azureOpenAiResourceGroup"]["defaultValue"], "")
+
+    def test_bootstrap_script_contains_managed_identity_proxy(self):
+        self.assertIn("OPENCLAW_AZURE_OPENAI_AUTH_MODE='{2}'", self.bootstrap_script)
+        self.assertIn("azure-openai-mi-proxy", self.bootstrap_script)
+        self.assertIn("TokenManager", self.bootstrap_script)
+        self.assertIn(
+            "169.254.169.254/metadata/identity/oauth2/token",
+            self.bootstrap_script,
+        )
+        self.assertIn("cognitiveservices.azure.com", self.bootstrap_script)
+        self.assertIn("azure-openai-mi-proxy.service", self.bootstrap_script)
+        self.assertIn(
+            'if [ "$OPENCLAW_AZURE_OPENAI_AUTH_MODE" = "managedIdentity" ]',
+            self.bootstrap_script,
+        )
+        self.assertIn('"apiKey": "managed-identity"', self.bootstrap_script)
+        self.assertIn(
+            '"apiKey": "$OPENCLAW_AZURE_OPENAI_API_KEY"', self.bootstrap_script
+        )
+
+    def test_ui_definition_contains_auth_mode_dropdown(self):
+        steps = self.ui_definition["parameters"]["steps"]
+        openai_step = next(step for step in steps if step["name"] == "openai")
+        element_names = [e["name"] for e in openai_step["elements"]]
+        self.assertIn("azureOpenAiAuthMode", element_names)
+        self.assertIn("managedIdentityInfo", element_names)
+        self.assertIn("azureOpenAiResourceGroup", element_names)
+
+        auth_mode_element = next(
+            e for e in openai_step["elements"] if e["name"] == "azureOpenAiAuthMode"
+        )
+        self.assertEqual(auth_mode_element["type"], "Microsoft.Common.DropDown")
+        allowed_values = [
+            v["value"] for v in auth_mode_element["constraints"]["allowedValues"]
+        ]
+        self.assertEqual(sorted(allowed_values), ["", "key", "managedIdentity"])
+
+        rg_element = next(
+            e
+            for e in openai_step["elements"]
+            if e["name"] == "azureOpenAiResourceGroup"
+        )
+        self.assertEqual(rg_element["type"], "Microsoft.Common.TextBox")
+
+        outputs = self.ui_definition["parameters"]["outputs"]
+        self.assertIn("azureOpenAiAuthMode", outputs)
+        self.assertIn("azureOpenAiResourceGroup", outputs)
+
+    def test_readme_documents_managed_identity_option(self):
+        self.assertIn("Managed Identity", self.readme)
+        self.assertIn("Cognitive Services OpenAI User", self.readme)
+        self.assertIn("vmPrincipalId", self.readme)
+
 
 if __name__ == "__main__":
     unittest.main()

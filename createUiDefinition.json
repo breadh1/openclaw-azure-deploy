@@ -108,13 +108,29 @@
         "label": "Azure OpenAI (Recommended)",
         "elements": [
           {
+            "name": "azureOpenAiAuthMode",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Authentication Mode",
+            "toolTip": "Select how to authenticate with Azure OpenAI. API Key uses a static key. Managed Identity uses the VM's system-assigned managed identity with Entra ID (requires role assignment after deployment).",
+            "defaultValue": "None (Skip Azure OpenAI)",
+            "constraints": {
+              "required": true,
+              "allowedValues": [
+                { "label": "None (Skip Azure OpenAI)", "value": "" },
+                { "label": "API Key", "value": "key" },
+                { "label": "Managed Identity (Entra ID)", "value": "managedIdentity" }
+              ]
+            }
+          },
+          {
             "name": "azureOpenAiEndpoint",
             "type": "Microsoft.Common.TextBox",
             "label": "Endpoint",
-            "toolTip": "Fill in all three Azure OpenAI fields together, or leave all three empty.",
+            "toolTip": "Azure OpenAI resource endpoint, for example https://myresource.openai.azure.com.",
             "defaultValue": "",
+            "visible": "[not(empty(steps('openai').azureOpenAiAuthMode))]",
             "constraints": {
-              "required": false
+              "required": "[not(empty(steps('openai').azureOpenAiAuthMode))]"
             }
           },
           {
@@ -123,8 +139,9 @@
             "label": "Deployment Name",
             "toolTip": "Azure OpenAI deployment name used by OpenClaw as the primary model ref.",
             "defaultValue": "",
+            "visible": "[not(empty(steps('openai').azureOpenAiAuthMode))]",
             "constraints": {
-              "required": false
+              "required": "[not(empty(steps('openai').azureOpenAiAuthMode))]"
             }
           },
           {
@@ -135,9 +152,30 @@
               "confirmPassword": "Confirm API Key"
             },
             "toolTip": "API key for the Azure OpenAI resource.",
+            "visible": "[equals(steps('openai').azureOpenAiAuthMode, 'key')]",
             "options": {
               "hideConfirmation": true
             },
+            "constraints": {
+              "required": "[equals(steps('openai').azureOpenAiAuthMode, 'key')]"
+            }
+          },
+          {
+            "name": "managedIdentityInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[equals(steps('openai').azureOpenAiAuthMode, 'managedIdentity')]",
+            "options": {
+              "icon": "Info",
+              "text": "The template will automatically assign the 'Cognitive Services OpenAI User' role to the VM's managed identity on your Azure OpenAI resource. This requires the deploying user to have Owner or User Access Administrator role. If the role assignment fails, the deployment output will include the Azure CLI command to assign it manually."
+            }
+          },
+          {
+            "name": "azureOpenAiResourceGroup",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Azure OpenAI Resource Group (Optional)",
+            "toolTip": "Leave empty if the Azure OpenAI resource is in the same resource group as this deployment. Fill in only if it is in a different resource group within the same subscription.",
+            "defaultValue": "",
+            "visible": "[equals(steps('openai').azureOpenAiAuthMode, 'managedIdentity')]",
             "constraints": {
               "required": false
             }
@@ -215,9 +253,11 @@
       "dataDiskSizeGb": "[int(basics('dataDiskSizeGb'))]",
       "location": "[location()]",
       "hostname": "[basics('hostname')]",
+      "azureOpenAiAuthMode": "[steps('openai').azureOpenAiAuthMode]",
       "azureOpenAiEndpoint": "[steps('openai').azureOpenAiEndpoint]",
       "azureOpenAiDeployment": "[steps('openai').azureOpenAiDeployment]",
       "azureOpenAiApiKey": "[steps('openai').azureOpenAiApiKey.password]",
+      "azureOpenAiResourceGroup": "[steps('openai').azureOpenAiResourceGroup]",
       "feishuAppId": "[steps('feishu').feishuAppId]",
       "feishuAppSecret": "[steps('feishu').feishuAppSecret.password]",
       "msteamsAppId": "[steps('teams').msteamsAppId]",
