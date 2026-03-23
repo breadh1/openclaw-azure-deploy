@@ -6,7 +6,7 @@
     "config": {
       "isWizard": true,
       "basics": {
-        "description": "Deploy OpenClaw to Azure with optional Azure OpenAI, Feishu, and Microsoft Teams configuration. Microsoft Teams standard mode supports Azure Global only.",
+        "description": "Deploy OpenClaw to Azure with optional Azure OpenAI, Feishu, and Microsoft Teams configuration. Managed Identity authentication is not available in Azure China.",
         "location": {
           "label": "Region",
           "toolTip": "Azure region used for both the resource group and the OpenClaw resources created by this template.",
@@ -112,13 +112,29 @@
             "type": "Microsoft.Common.DropDown",
             "label": "Authentication Mode",
             "toolTip": "Select how to authenticate with Azure OpenAI. API Key uses a static key. Managed Identity uses the VM's system-assigned managed identity with Entra ID (requires role assignment after deployment).",
-            "defaultValue": "None (Skip Azure OpenAI)",
+            "defaultValue": "Managed Identity (Entra ID)",
+            "visible": "[not(startsWith(location(), 'china'))]",
             "constraints": {
-              "required": true,
+              "required": "[not(startsWith(location(), 'china'))]",
               "allowedValues": [
                 { "label": "None (Skip Azure OpenAI)", "value": "none" },
                 { "label": "API Key", "value": "key" },
                 { "label": "Managed Identity (Entra ID)", "value": "managedIdentity" }
+              ]
+            }
+          },
+          {
+            "name": "azureOpenAiAuthModeChina",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Authentication Mode",
+            "toolTip": "Select how to authenticate with Azure OpenAI. API Key uses a static key. Managed Identity is not available in Azure China.",
+            "defaultValue": "API Key",
+            "visible": "[startsWith(location(), 'china')]",
+            "constraints": {
+              "required": "[startsWith(location(), 'china')]",
+              "allowedValues": [
+                { "label": "None (Skip Azure OpenAI)", "value": "none" },
+                { "label": "API Key", "value": "key" }
               ]
             }
           },
@@ -128,9 +144,9 @@
             "label": "Endpoint",
             "toolTip": "Azure OpenAI resource endpoint, for example https://myresource.openai.azure.com.",
             "defaultValue": "",
-            "visible": "[not(equals(steps('openai').azureOpenAiAuthMode, 'none'))]",
+            "visible": "[not(equals(if(startsWith(location(), 'china'), steps('openai').azureOpenAiAuthModeChina, steps('openai').azureOpenAiAuthMode), 'none'))]",
             "constraints": {
-              "required": "[not(equals(steps('openai').azureOpenAiAuthMode, 'none'))]"
+              "required": "[not(equals(if(startsWith(location(), 'china'), steps('openai').azureOpenAiAuthModeChina, steps('openai').azureOpenAiAuthMode), 'none'))]"
             }
           },
           {
@@ -139,9 +155,9 @@
             "label": "Deployment Name",
             "toolTip": "Azure OpenAI deployment name used by OpenClaw as the primary model ref.",
             "defaultValue": "",
-            "visible": "[not(equals(steps('openai').azureOpenAiAuthMode, 'none'))]",
+            "visible": "[not(equals(if(startsWith(location(), 'china'), steps('openai').azureOpenAiAuthModeChina, steps('openai').azureOpenAiAuthMode), 'none'))]",
             "constraints": {
-              "required": "[not(equals(steps('openai').azureOpenAiAuthMode, 'none'))]"
+              "required": "[not(equals(if(startsWith(location(), 'china'), steps('openai').azureOpenAiAuthModeChina, steps('openai').azureOpenAiAuthMode), 'none'))]"
             }
           },
           {
@@ -152,18 +168,18 @@
               "confirmPassword": "Confirm API Key"
             },
             "toolTip": "API key for the Azure OpenAI resource.",
-            "visible": "[equals(steps('openai').azureOpenAiAuthMode, 'key')]",
+            "visible": "[equals(if(startsWith(location(), 'china'), steps('openai').azureOpenAiAuthModeChina, steps('openai').azureOpenAiAuthMode), 'key')]",
             "options": {
               "hideConfirmation": true
             },
             "constraints": {
-              "required": "[equals(steps('openai').azureOpenAiAuthMode, 'key')]"
+              "required": "[equals(if(startsWith(location(), 'china'), steps('openai').azureOpenAiAuthModeChina, steps('openai').azureOpenAiAuthMode), 'key')]"
             }
           },
           {
             "name": "managedIdentityInfo",
             "type": "Microsoft.Common.InfoBox",
-            "visible": "[equals(steps('openai').azureOpenAiAuthMode, 'managedIdentity')]",
+            "visible": "[and(not(startsWith(location(), 'china')), equals(steps('openai').azureOpenAiAuthMode, 'managedIdentity'))]",
             "options": {
               "icon": "Info",
               "text": "The template will automatically attempt to assign the 'Cognitive Services OpenAI User' role to the VM's managed identity. If your account has Owner or User Access Administrator role, this succeeds automatically. If not, the Azure portal may show the deployment as partially failed, but the VM and OpenClaw are fully functional. The deployment outputs include the Azure CLI command to assign the role manually — no redeployment needed."
@@ -175,7 +191,7 @@
             "label": "Azure OpenAI Resource Group (Optional)",
             "toolTip": "Leave empty if the Azure OpenAI resource is in the same resource group as this deployment. Fill in only if it is in a different resource group within the same subscription.",
             "defaultValue": "",
-            "visible": "[equals(steps('openai').azureOpenAiAuthMode, 'managedIdentity')]",
+            "visible": "[and(not(startsWith(location(), 'china')), equals(steps('openai').azureOpenAiAuthMode, 'managedIdentity'))]",
             "constraints": {
               "required": false
             }
@@ -221,7 +237,7 @@
             "name": "msteamsAppId",
             "type": "Microsoft.Common.TextBox",
             "label": "Bot App ID",
-            "toolTip": "Optional. Fill in both Teams fields together, or leave both empty. Standard mode uses the current Azure tenant automatically. Azure Global only.",
+            "toolTip": "Optional. Fill in both Teams fields together, or leave both empty. Standard mode uses the current Azure tenant automatically.",
             "defaultValue": "",
             "constraints": {
               "required": false
@@ -253,7 +269,7 @@
       "dataDiskSizeGb": "[int(basics('dataDiskSizeGb'))]",
       "location": "[location()]",
       "hostname": "[basics('hostname')]",
-      "azureOpenAiAuthMode": "[steps('openai').azureOpenAiAuthMode]",
+      "azureOpenAiAuthMode": "[if(startsWith(location(), 'china'), steps('openai').azureOpenAiAuthModeChina, steps('openai').azureOpenAiAuthMode)]",
       "azureOpenAiEndpoint": "[steps('openai').azureOpenAiEndpoint]",
       "azureOpenAiDeployment": "[steps('openai').azureOpenAiDeployment]",
       "azureOpenAiApiKey": "[steps('openai').azureOpenAiApiKey.password]",

@@ -116,14 +116,14 @@
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Optional Microsoft Teams Bot App ID. Fill in both Teams fields together, or leave both empty. Azure Global only."
+        "description": "Optional Microsoft Teams Bot App ID. Fill in both Teams fields together, or leave both empty."
       }
     },
     "msteamsAppPassword": {
       "type": "secureString",
       "defaultValue": "",
       "metadata": {
-        "description": "Optional Microsoft Teams Bot App Password. Fill in both Teams fields together, or leave both empty. Azure Global only."
+        "description": "Optional Microsoft Teams Bot App Password. Fill in both Teams fields together, or leave both empty."
       }
     }
   },
@@ -148,7 +148,7 @@
     "msteamsWebhookUrl": "[if(empty(parameters('hostname')), format('https://{0}{1}', variables('publicFqdn'), variables('msteamsWebhookPath')), format('https://{0}{1}', parameters('hostname'), variables('msteamsWebhookPath')))]",
     "allowedOriginsJson": "[if(empty(parameters('hostname')), concat('[\"', variables('publicOrigin'), '\"]'), concat('[\"', variables('publicOrigin'), '\",\"', variables('hostnameOrigin'), '\"]'))]",
     "azureOpenAiEffectiveAuthMode": "[if(and(not(empty(parameters('azureOpenAiAuthMode'))), not(equals(parameters('azureOpenAiAuthMode'), 'none'))), parameters('azureOpenAiAuthMode'), if(and(not(empty(parameters('azureOpenAiEndpoint'))), not(empty(parameters('azureOpenAiDeployment'))), not(empty(parameters('azureOpenAiApiKey')))), 'key', ''))]",
-    "azureOpenAiValidationMode": "[if(empty(variables('azureOpenAiEffectiveAuthMode')), if(and(empty(parameters('azureOpenAiEndpoint')), empty(parameters('azureOpenAiDeployment')), empty(parameters('azureOpenAiApiKey'))), 'disabled', string(int('When azureOpenAiAuthMode is not set, azureOpenAiEndpoint, azureOpenAiDeployment, and azureOpenAiApiKey must either all be provided or all be empty.'))), if(equals(variables('azureOpenAiEffectiveAuthMode'), 'key'), if(and(not(empty(parameters('azureOpenAiEndpoint'))), not(empty(parameters('azureOpenAiDeployment'))), not(empty(parameters('azureOpenAiApiKey')))), 'enabled', string(int('azureOpenAiAuthMode key requires azureOpenAiEndpoint, azureOpenAiDeployment, and azureOpenAiApiKey.'))), if(and(not(empty(parameters('azureOpenAiEndpoint'))), not(empty(parameters('azureOpenAiDeployment')))), 'enabled', string(int('azureOpenAiAuthMode managedIdentity requires azureOpenAiEndpoint and azureOpenAiDeployment.')))))]",
+    "azureOpenAiValidationMode": "[if(empty(variables('azureOpenAiEffectiveAuthMode')), if(and(empty(parameters('azureOpenAiEndpoint')), empty(parameters('azureOpenAiDeployment')), empty(parameters('azureOpenAiApiKey'))), 'disabled', string(int('When azureOpenAiAuthMode is not set, azureOpenAiEndpoint, azureOpenAiDeployment, and azureOpenAiApiKey must either all be provided or all be empty.'))), if(equals(variables('azureOpenAiEffectiveAuthMode'), 'key'), if(and(not(empty(parameters('azureOpenAiEndpoint'))), not(empty(parameters('azureOpenAiDeployment'))), not(empty(parameters('azureOpenAiApiKey')))), 'enabled', string(int('azureOpenAiAuthMode key requires azureOpenAiEndpoint, azureOpenAiDeployment, and azureOpenAiApiKey.'))), if(variables('isAzureChinaCloud'), string(int('Managed Identity authentication for Azure OpenAI is not supported in Azure China Cloud because Azure OpenAI is not available in this environment.')), if(and(not(empty(parameters('azureOpenAiEndpoint'))), not(empty(parameters('azureOpenAiDeployment')))), 'enabled', string(int('azureOpenAiAuthMode managedIdentity requires azureOpenAiEndpoint and azureOpenAiDeployment.'))))))]",
     "hasAzureOpenAiConfig": "[equals(variables('azureOpenAiValidationMode'), 'enabled')]",
     "isManagedIdentityAuth": "[equals(variables('azureOpenAiEffectiveAuthMode'), 'managedIdentity')]",
     "azureOpenAiResourceName": "[if(empty(parameters('azureOpenAiEndpoint')), '', first(split(last(split(parameters('azureOpenAiEndpoint'), '//')), '.')))]",
@@ -158,7 +158,7 @@
     "feishuValidationMode": "[if(and(empty(parameters('feishuAppId')), empty(parameters('feishuAppSecret'))), 'disabled', if(and(not(empty(parameters('feishuAppId'))), not(empty(parameters('feishuAppSecret')))), 'enabled', string(int('feishu parameters feishuAppId and feishuAppSecret must either both be provided or both be empty.'))))]",
     "hasFeishuConfig": "[equals(variables('feishuValidationMode'), 'enabled')]",
     "msteamsTenantId": "[subscription().tenantId]",
-    "msteamsValidationMode": "[if(and(empty(parameters('msteamsAppId')), empty(parameters('msteamsAppPassword'))), 'disabled', if(and(not(empty(parameters('msteamsAppId'))), not(empty(parameters('msteamsAppPassword'))), not(variables('isAzureChinaCloud'))), 'enabled', string(int('Microsoft Teams standard mode requires both msteamsAppId and msteamsAppPassword, and is supported only in Azure Global.'))))]",
+    "msteamsValidationMode": "[if(and(empty(parameters('msteamsAppId')), empty(parameters('msteamsAppPassword'))), 'disabled', if(and(not(empty(parameters('msteamsAppId'))), not(empty(parameters('msteamsAppPassword')))), 'enabled', string(int('Microsoft Teams standard mode requires both msteamsAppId and msteamsAppPassword.'))))]",
     "hasMsTeamsConfig": "[equals(variables('msteamsValidationMode'), 'enabled')]",
     "botServiceName": "[format('{0}-bot-{1}', take(parameters('vmName'), 51), substring(uniqueString(resourceGroup().id, parameters('msteamsAppId')), 0, 8))]",
     "caddySiteAddresses": "[if(empty(parameters('hostname')), variables('publicFqdn'), format('{0}, {1}', variables('publicFqdn'), parameters('hostname')))]",

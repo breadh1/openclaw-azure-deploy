@@ -145,7 +145,7 @@ class AzureDeployTemplateTests(unittest.TestCase):
             variables["feishuValidationMode"],
         )
 
-    def test_msteams_parameters_are_optional_but_paired_and_global_only(self):
+    def test_msteams_parameters_are_optional_but_paired(self):
         parameters = self.template["parameters"]
         self.assertIn("msteamsAppId", parameters)
         self.assertIn("msteamsAppPassword", parameters)
@@ -157,11 +157,32 @@ class AzureDeployTemplateTests(unittest.TestCase):
         self.assertIn("msteamsValidationMode", variables)
         self.assertIn("msteamsAppId", variables["msteamsValidationMode"])
         self.assertIn("msteamsAppPassword", variables["msteamsValidationMode"])
-        self.assertIn("Azure Global", variables["msteamsValidationMode"])
+        self.assertNotIn("Azure Global", variables["msteamsValidationMode"])
+        self.assertNotIn("isAzureChinaCloud", variables["msteamsValidationMode"])
         self.assertIn("take(parameters('vmName'), 51)", variables["botServiceName"])
         self.assertIn(
             "uniqueString(resourceGroup().id, parameters('msteamsAppId'))",
             variables["botServiceName"],
+        )
+
+    def test_msteams_parameters_do_not_restrict_azure_china(self):
+        parameters = self.template["parameters"]
+        self.assertNotIn(
+            "Azure Global only",
+            parameters["msteamsAppId"]["metadata"]["description"],
+        )
+        self.assertNotIn(
+            "Azure Global only",
+            parameters["msteamsAppPassword"]["metadata"]["description"],
+        )
+
+    def test_managed_identity_blocked_in_azure_china(self):
+        variables = self.template["variables"]
+        validation = variables["azureOpenAiValidationMode"]
+        self.assertIn("isAzureChinaCloud", validation)
+        self.assertIn(
+            "Managed Identity authentication for Azure OpenAI is not supported in Azure China Cloud",
+            validation,
         )
 
     def test_arm_template_no_longer_generates_openclaw_config(self):
@@ -904,6 +925,7 @@ class AzureDeployTemplateTests(unittest.TestCase):
         openai_step = next(step for step in steps if step["name"] == "openai")
         element_names = [e["name"] for e in openai_step["elements"]]
         self.assertIn("azureOpenAiAuthMode", element_names)
+        self.assertIn("azureOpenAiAuthModeChina", element_names)
         self.assertIn("managedIdentityInfo", element_names)
         self.assertIn("azureOpenAiResourceGroup", element_names)
 
@@ -916,6 +938,18 @@ class AzureDeployTemplateTests(unittest.TestCase):
         ]
         self.assertEqual(sorted(allowed_values), ["key", "managedIdentity", "none"])
 
+        auth_mode_china = next(
+            e
+            for e in openai_step["elements"]
+            if e["name"] == "azureOpenAiAuthModeChina"
+        )
+        self.assertEqual(auth_mode_china["type"], "Microsoft.Common.DropDown")
+        china_values = [
+            v["value"] for v in auth_mode_china["constraints"]["allowedValues"]
+        ]
+        self.assertEqual(sorted(china_values), ["key", "none"])
+        self.assertNotIn("managedIdentity", china_values)
+
         rg_element = next(
             e
             for e in openai_step["elements"]
@@ -927,10 +961,45 @@ class AzureDeployTemplateTests(unittest.TestCase):
         self.assertIn("azureOpenAiAuthMode", outputs)
         self.assertIn("azureOpenAiResourceGroup", outputs)
 
+    def test_ui_definition_hides_managed_identity_in_china(self):
+        steps = self.ui_definition["parameters"]["steps"]
+        openai_step = next(step for step in steps if step["name"] == "openai")
+
+        global_dropdown = next(
+            e for e in openai_step["elements"] if e["name"] == "azureOpenAiAuthMode"
+        )
+        china_dropdown = next(
+            e
+            for e in openai_step["elements"]
+            if e["name"] == "azureOpenAiAuthModeChina"
+        )
+
+        # Global dropdown visible only in non-China
+        self.assertIn("not(startsWith(location()", global_dropdown["visible"])
+        # China dropdown visible only in China
+        self.assertIn("startsWith(location()", china_dropdown["visible"])
+
+        # Output conditionally picks the correct dropdown
+        outputs = self.ui_definition["parameters"]["outputs"]
+        auth_mode_output = outputs["azureOpenAiAuthMode"]
+        self.assertIn("startsWith(location()", auth_mode_output)
+        self.assertIn("azureOpenAiAuthModeChina", auth_mode_output)
+        self.assertIn("azureOpenAiAuthMode", auth_mode_output)
+
     def test_readme_documents_managed_identity_option(self):
         self.assertIn("Managed Identity", self.readme)
         self.assertIn("Cognitive Services OpenAI User", self.readme)
         self.assertIn("vmPrincipalId", self.readme)
+
+    def test_readme_documents_teams_setup_steps(self):
+        self.assertIn("Microsoft Entra ID", self.readme)
+        self.assertIn("openclaw-teams-bot", self.readme)
+        self.assertIn("Teams Bot App ID", self.readme)
+        self.assertIn("Teams Bot App Password", self.readme)
+        self.assertIn("openclaw-approve-teams-pairing", self.readme)
+        self.assertIn("build-app-package.ps1", self.readme)
+        self.assertIn("Upload a custom app", self.readme)
+        self.assertIn("pairing code", self.readme)
 
 
 if __name__ == "__main__":

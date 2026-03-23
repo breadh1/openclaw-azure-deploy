@@ -46,6 +46,8 @@ cat ~/.ssh/id_ed25519.pub
 
 Managed Identity 模式下，模板会自动尝试为 VM 分配 `Cognitive Services OpenAI User` 角色。如果部署用户权限不足，角色分配会失败，但 VM 和 OpenClaw 仍然正常部署完成（Azure 门户可能显示"部分失败"）。用户只需后续手动补上角色即可，不需要重新部署（详见第 5 步）。
 
+> **Azure China 用户注意：** Azure China 环境不提供 Azure OpenAI 资源，因此 Managed Identity 模式在 Azure China 中不可用。Azure China 用户请选择 API Key 模式或跳过 Azure OpenAI 配置。
+
 不需要 Azure OpenAI 则全部留空。
 
 ## 3.（可选）准备通道集成信息
@@ -53,10 +55,17 @@ Managed Identity 模式下，模板会自动尝试为 VM 分配 `Cognitive Servi
 **飞书（Azure China / Azure Global 均可）：** 在飞书开放平台创建企业自建应用，开启机器人能力，添加 `im.message.receive_v1` 事件订阅并选择 WebSocket 长连接模式，发布应用后获取：
 - **Feishu App ID** 和 **Feishu App Secret**（两个参数要么全填，要么全部留空）
 
-**Microsoft Teams（仅 Azure Global）：** 在 Azure 中创建 Azure Bot / App Registration，获取：
-- **Teams Bot App ID** 和 **Teams Bot App Password**（两个参数要么全填，要么全部留空）
+**Microsoft Teams（Azure China / Azure Global 均可）：**
 
-模板自动使用当前 Azure tenant 作为 Teams tenant ID，无需手动填写。
+1. 在 Azure 门户中，进入 **Microsoft Entra ID** → **应用注册** → **新注册**：
+   - 名称：任意（如 `openclaw-teams-bot`）
+   - 受支持的帐户类型：选择**仅此组织目录中的帐户（单租户）**
+   - 重定向 URI：留空
+   - 点击**注册**
+2. 注册完成后，记录**应用程序(客户端) ID** — 即 **Teams Bot App ID**。
+3. 进入**证书和密码** → **新客户端密码**，添加密码并记录密码值 — 即 **Teams Bot App Password**。
+
+部署时提供以上两个参数（要么全填，要么全部留空）。模板会自动创建 Azure Bot Service 并关联 Teams Channel，无需手动配置。模板自动使用当前 Azure tenant 作为 Teams tenant ID，无需手动填写。
 
 ## 4. 部署到 Azure
 
@@ -177,7 +186,34 @@ openclaw-approve-browser
 
 > OpenClaw 上游 `2026.3.12` 到 `2026.3.13` 期间存在已知的 loopback WebSocket 握手回归，`openclaw devices list` 可能报错，但本模板的 `openclaw-approve-browser` 不依赖该路径。
 
-## 9. （可选）后续升级
+## 9.（可选）Teams 部署后配置
+
+如果部署时填写了 Teams 参数，模板已自动创建 Azure Bot Service。部署完成后，需要生成 Teams 应用包并上传到 Teams：
+
+1. 在本地 PowerShell 中运行（需要先 clone 本仓库）：
+   ```powershell
+   ./teams-app-package/build-app-package.ps1 `
+     -AppId "<Teams Bot App ID>" `
+     -BotDomain "<vmPublicFqdn>"
+   ```
+   将 `<Teams Bot App ID>` 替换为第 3 步获取的应用 ID，`<vmPublicFqdn>` 替换为部署输出中的域名。脚本生成的 zip 文件位于 `teams-app-package/dist/` 目录。
+
+2. 打开 Microsoft Teams → 左侧**应用** → **管理你的应用** → **上传自定义应用**，选择生成的 zip 文件上传。
+
+3. 上传成功后，向 Bot 发送一条私聊消息。Bot 会返回一个配对码（pairing code）。
+
+4. SSH 登录 VM，执行以下命令完成配对：
+   ```bash
+   openclaw-approve-teams-pairing
+   ```
+   该 helper 会自动获取最新的 Teams 配对请求并批准。也可以手动传入配对码：
+   ```bash
+   openclaw-approve-teams-pairing <pairing-code>
+   ```
+
+配对完成后即可在 Teams 中正常与 Bot 对话。
+
+## 10. （可选）后续升级
 
 本模板使用官方 `install-cli.sh` 安装器将 CLI 和专用 Node 运行时装到用户的 `~/.openclaw` 前缀下，再通过 `openclaw onboard --non-interactive --install-daemon` 完成 gateway 安装，最后通过 `openclaw config` 写入 Azure 传入的配置。
 
@@ -203,7 +239,7 @@ openclaw doctor
 openclaw gateway restart
 ```
 
-## 10.（可选）切换 Gateway 模式
+## 11.（可选）切换 Gateway 模式
 
 SSH 管理员默认走本机 loopback gateway。如需切到公网 `wss://` gateway 排查问题：
 ```bash
@@ -280,6 +316,8 @@ If you want Azure OpenAI ready immediately after deployment, prepare the followi
 
 In Managed Identity mode, the template automatically attempts to assign the `Cognitive Services OpenAI User` role to the VM. If the deploying user lacks sufficient permissions, the role assignment fails but the VM and OpenClaw are fully deployed and functional (the Azure portal may show the deployment as "partially failed"). Just assign the role manually afterward — no redeployment needed (see Step 5).
 
+> **Azure China users:** Azure OpenAI is not available in Azure China, so Managed Identity mode cannot be used. Please choose API Key mode or skip Azure OpenAI configuration.
+
 Leave all Azure OpenAI fields empty to skip.
 
 ## 3. (Optional) Prepare Channel Integration Information
@@ -287,10 +325,17 @@ Leave all Azure OpenAI fields empty to skip.
 **Feishu (Azure China / Azure Global):** Create a self-built enterprise app on the Feishu Open Platform, enable bot capability, add the `im.message.receive_v1` event subscription with WebSocket long-connection mode, publish the app, then obtain:
 - **Feishu App ID** and **Feishu App Secret** (provide both or leave both empty)
 
-**Microsoft Teams (Azure Global only):** Create an Azure Bot / App Registration, then obtain:
-- **Teams Bot App ID** and **Teams Bot App Password** (provide both or leave both empty)
+**Microsoft Teams (Azure China / Azure Global):**
 
-The template automatically uses the current Azure tenant as the Teams tenant ID.
+1. In the Azure portal, go to **Microsoft Entra ID** → **App registrations** → **New registration**:
+   - Name: any name (e.g. `openclaw-teams-bot`)
+   - Supported account types: **Accounts in this organizational directory only (Single tenant)**
+   - Redirect URI: leave blank
+   - Click **Register**
+2. After registration, note the **Application (client) ID** — this is the **Teams Bot App ID**.
+3. Go to **Certificates & secrets** → **New client secret**, add a secret and note the secret value — this is the **Teams Bot App Password**.
+
+Provide both parameters during deployment (or leave both empty). The template automatically creates the Azure Bot Service and connects the Teams Channel — no manual configuration needed. The template also uses the current Azure tenant as the Teams tenant ID.
 
 ## 4. Deploy to Azure
 
@@ -411,7 +456,34 @@ This helper reads the local browser pairing queue directly and approves the newe
 
 > Known upstream note: OpenClaw `2026.3.12` through `2026.3.13` has a reported loopback WebSocket handshake regression on some hosts. The `openclaw-approve-browser` helper avoids that code path.
 
-## 9. (Optional) Updating Later
+## 9. (Optional) Post-Deployment Teams Setup
+
+If you provided Teams parameters during deployment, the template has already created the Azure Bot Service. After deployment, you need to generate a Teams app package and upload it to Teams:
+
+1. Run the following in PowerShell locally (clone this repository first):
+   ```powershell
+   ./teams-app-package/build-app-package.ps1 `
+     -AppId "<Teams Bot App ID>" `
+     -BotDomain "<vmPublicFqdn>"
+   ```
+   Replace `<Teams Bot App ID>` with the app ID from Step 3, and `<vmPublicFqdn>` with the domain from deployment outputs. The generated zip file is in `teams-app-package/dist/`.
+
+2. Open Microsoft Teams → **Apps** on the left → **Manage your apps** → **Upload a custom app**, and upload the generated zip file.
+
+3. After upload, send a direct message to the bot. The bot will return a pairing code.
+
+4. SSH into the VM and run:
+   ```bash
+   openclaw-approve-teams-pairing
+   ```
+   This helper automatically finds the latest Teams pairing request and approves it. You can also pass the pairing code manually:
+   ```bash
+   openclaw-approve-teams-pairing <pairing-code>
+   ```
+
+After pairing, you can chat with the bot in Teams normally.
+
+## 10. (Optional) Updating Later
 
 This template uses the official `install-cli.sh` installer to place the CLI and its dedicated Node runtime under the user's `~/.openclaw` prefix, then runs `openclaw onboard --non-interactive --install-daemon` to install the gateway service, and finally applies Azure-provided settings through `openclaw config`.
 
@@ -437,7 +509,7 @@ openclaw doctor
 openclaw gateway restart
 ```
 
-## 10. (Optional) Switch Gateway Mode
+## 11. (Optional) Switch Gateway Mode
 
 The SSH admin shell uses the local loopback gateway by default. To switch to the public `wss://` gateway for troubleshooting:
 ```bash
