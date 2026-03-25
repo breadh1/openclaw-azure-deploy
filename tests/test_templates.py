@@ -274,10 +274,6 @@ class AzureDeployTemplateTests(unittest.TestCase):
             self.bootstrap_script,
         )
         self.assertIn(
-            'OPENCLAW_LOSSLESS_CLAW_SPEC="@martian-engineering/lossless-claw@0.3.0"',
-            self.bootstrap_script,
-        )
-        self.assertIn(
             "PATH=/home/{5}/.openclaw/tools/node/bin:/home/{5}/.openclaw/bin:/usr/local/bin:/usr/bin:/bin",
             self.bootstrap_script,
         )
@@ -348,10 +344,6 @@ class AzureDeployTemplateTests(unittest.TestCase):
             self.bootstrap_script,
         )
         self.assertIn(
-            'run_admin_bus_bash \'cd "$HOME" && exec /usr/local/bin/openclaw plugins install "$1" --pin\' "$OPENCLAW_LOSSLESS_CLAW_SPEC"',
-            self.bootstrap_script,
-        )
-        self.assertIn(
             'run_admin_bash \'export PATH="$HOME/.openclaw/tools/node/bin:$PATH" && "$HOME/.openclaw/tools/node/bin/npm" config set prefix "$HOME/.openclaw"\'',
             self.bootstrap_script,
         )
@@ -369,58 +361,6 @@ class AzureDeployTemplateTests(unittest.TestCase):
         )
         self.assertIn(
             "OpenClaw install package directory was not found after install-cli.sh completed: $OPENCLAW_INSTALL_PACKAGE_DIR",
-            self.bootstrap_script,
-        )
-        self.assertIn(
-            "install_openclaw_extension_dependencies() {",
-            self.bootstrap_script,
-        )
-        self.assertIn(
-            "resolve_gateway_service_entrypoint_path() {",
-            self.bootstrap_script,
-        )
-        self.assertIn(
-            "OpenClaw bundled extension package was not found at $extension_dir",
-            self.bootstrap_script,
-        )
-        self.assertIn(
-            'if ! grep -q \'"dependencies"[[:space:]]*:\' "$extension_dir/package.json"; then',
-            self.bootstrap_script,
-        )
-        self.assertIn(
-            'run_admin_bash \'export PATH="$(dirname "$1"):$PATH" && "$1" install --omit=dev --prefix "$2"\' "$OPENCLAW_NPM_BIN" "$extension_dir"',
-            self.bootstrap_script,
-        )
-        self.assertIn(
-            'OPENCLAW_CONFIGURED_BUNDLED_EXTENSIONS="$OPENCLAW_CONFIGURED_BUNDLED_EXTENSIONS feishu"',
-            self.bootstrap_script,
-        )
-        self.assertIn(
-            'OPENCLAW_CONFIGURED_BUNDLED_EXTENSIONS="$OPENCLAW_CONFIGURED_BUNDLED_EXTENSIONS msteams"',
-            self.bootstrap_script,
-        )
-        self.assertIn(
-            "run_openclaw_config_string plugins.slots.contextEngine lossless-claw",
-            self.bootstrap_script,
-        )
-        self.assertIn(
-            'OPENCLAW_GATEWAY_SERVICE_UNIT="/home/{5}/.config/systemd/user/openclaw-gateway.service"',
-            self.bootstrap_script,
-        )
-        self.assertIn(
-            'OPENCLAW_GATEWAY_ENTRYPOINT="$(resolve_gateway_service_entrypoint_path "$OPENCLAW_GATEWAY_SERVICE_UNIT")"',
-            self.bootstrap_script,
-        )
-        self.assertIn(
-            'OPENCLAW_GATEWAY_PACKAGE_DIR="$(dirname "$(dirname "$OPENCLAW_GATEWAY_ENTRYPOINT")")"',
-            self.bootstrap_script,
-        )
-        self.assertIn(
-            'OPENCLAW_PACKAGE_DIRS="$OPENCLAW_INSTALL_PACKAGE_DIR"',
-            self.bootstrap_script,
-        )
-        self.assertIn(
-            'install_openclaw_extension_dependencies "$OPENCLAW_PACKAGE_DIR" "$OPENCLAW_EXTENSION_ID"',
             self.bootstrap_script,
         )
         self.assertNotIn(
