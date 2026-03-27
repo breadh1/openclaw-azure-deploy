@@ -6,7 +6,7 @@
     "config": {
       "isWizard": true,
       "basics": {
-        "description": "Deploy OpenClaw to Azure with optional Azure OpenAI, Feishu, and Microsoft Teams configuration. Managed Identity authentication is not available in Azure China.",
+        "description": "Deploy OpenClaw to Azure with optional Azure OpenAI, and Microsoft Teams configuration. Managed Identity authentication is not available in Azure China.",
         "location": {
           "label": "Region",
           "toolTip": "Azure region used for both the resource group and the OpenClaw resources created by this template.",
@@ -198,38 +198,7 @@
           }
         ]
       },
-      {
-        "name": "feishu",
-        "label": "Feishu (Optional)",
-        "elements": [
-          {
-            "name": "feishuAppId",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Feishu App ID",
-            "toolTip": "Optional. Fill in both Feishu fields together, or leave both empty.",
-            "defaultValue": "",
-            "constraints": {
-              "required": false
-            }
-          },
-          {
-            "name": "feishuAppSecret",
-            "type": "Microsoft.Common.PasswordBox",
-            "label": {
-              "password": "Feishu App Secret",
-              "confirmPassword": "Confirm Feishu App Secret"
-            },
-            "toolTip": "Optional Feishu App Secret.",
-            "options": {
-              "hideConfirmation": true
-            },
-            "constraints": {
-              "required": false
-            }
-          }
-        ]
-      },
-      {
+            {
         "name": "teams",
         "label": "Microsoft Teams (Optional)",
         "elements": [
@@ -274,8 +243,6 @@
       "azureOpenAiDeployment": "[steps('openai').azureOpenAiDeployment]",
       "azureOpenAiApiKey": "[steps('openai').azureOpenAiApiKey.password]",
       "azureOpenAiResourceGroup": "[steps('openai').azureOpenAiResourceGroup]",
-      "feishuAppId": "[steps('feishu').feishuAppId]",
-      "feishuAppSecret": "[steps('feishu').feishuAppSecret.password]",
       "msteamsAppId": "[steps('teams').msteamsAppId]",
       "msteamsAppPassword": "[steps('teams').msteamsAppPassword.password]"
     }
