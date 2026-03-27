@@ -1,8 +1,8 @@
-# OpenClaw Azure One-Click Deployment
+# OpenClaw Azure 一鍵部署
 
 [中文](#zh-cn) | [English](#en)
 
-Azure 全球用户 / Azure Global users:
+Azure 全球使用者 / Azure Global users:
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fbreadh1%2Fopenclaw-azure-deploy%2Fmain%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fhanhsia%2Fopenclaw-azure-deploy%2Fmain%2FcreateUiDefinition.json)
 
@@ -11,9 +11,9 @@ Azure 全球用户 / Azure Global users:
 <a id="zh-cn"></a>
 # 中文部署指南
 
-## 1. 准备 SSH 密钥
+## 1. 準備 SSH 金鑰
 
-如果您已有 SSH 密钥对，可以跳过此步骤。
+如果您已有 SSH 金鑰對，可以跳過此步驟。
 
 **Windows（PowerShell）：**
 ```powershell
@@ -27,64 +27,59 @@ ssh-keygen -t ed25519 -C "openclaw-azure"
 cat ~/.ssh/id_ed25519.pub
 ```
 
-复制输出的公钥内容，稍后粘贴到部署表单中。
+複製輸出的公鑰內容，稍後貼到部署表單中。
 
-## 2. （可选）准备 Azure OpenAI 信息
+## 2.（選填）準備 Azure OpenAI 資訊
 
-如果您希望部署后立即使用 Azure OpenAI，请根据认证方式准备以下信息：
+如果您希望部署後立即使用 Azure OpenAI，請根據認證方式準備以下資訊：
 
-| 参数 | API Key 模式 | Managed Identity 模式（推荐） |
+| 參數 | API Key 模式 | Managed Identity 模式（建議） |
 |------|------------|--------------------------|
-| Azure OpenAI 终结点 | 必填 | 必填 |
-| 模型部署名称 | 必填 | 必填 |
-| API 密钥 | 必填 | 无需 |
-| Azure OpenAI 资源组名称 | 无需 | 跨资源组时填写 |
+| Azure OpenAI 端點 | 必填 | 必填 |
+| 模型部署名稱 | 必填 | 必填 |
+| API 金鑰 | 必填 | 無需 |
+| Azure OpenAI 資源群組名稱 | 無需 | 跨資源群組時填寫 |
 
-Managed Identity 模式下，模板会自动尝试为 VM 分配 `Cognitive Services OpenAI User` 角色。如果部署用户权限不足，角色分配会失败，但 VM 和 OpenClaw 仍然正常部署完成（Azure 门户可能显示"部分失败"）。用户只需后续手动补上角色即可，不需要重新部署（详见第 5 步）。
+Managed Identity 模式下，範本會自動嘗試為 VM 指派 `Cognitive Services OpenAI User` 角色。如果部署使用者權限不足，角色指派會失敗，但 VM 和 OpenClaw 仍然正常部署完成（Azure 入口網站可能顯示「部分失敗」）。使用者只需後續手動補上角色即可，不需要重新部署（詳見第 5 步）。
 
-> **Azure China 用户注意：** Azure China 环境不提供 Azure OpenAI 资源，因此 Managed Identity 模式在 Azure China 中不可用。Azure China 用户请选择 API Key 模式或跳过 Azure OpenAI 配置。
+> **Azure China 使用者注意：** Azure China 環境不提供 Azure OpenAI 資源，因此 Managed Identity 模式在 Azure China 中不可用。Azure China 使用者請選擇 API Key 模式或跳過 Azure OpenAI 設定。
 
-不需要 Azure OpenAI 则全部留空。
+不需要 Azure OpenAI 則全部留空。
 
-## 3.（可选）准备通道集成信息
+## 3.（選填）準備 Microsoft Teams 通道整合資訊
 
-**飞书（Azure China / Azure Global 均可）：** 在飞书开放平台创建企业自建应用，开启机器人能力，添加 `im.message.receive_v1` 事件订阅并选择 WebSocket 长连接模式，发布应用后获取：
-- **Feishu App ID** 和 **Feishu App Secret**（两个参数要么全填，要么全部留空）
+1. 在 Azure 入口網站中，前往 **Microsoft Entra ID**  **應用程式註冊**  **新增註冊**：
+   - 名稱：任意（如 `openclaw-teams-bot`）
+   - 支援的帳戶類型：選擇**僅此組織目錄中的帳戶（單一租用戶）**
+   - 重新導向 URI：留空
+   - 點擊**註冊**
+2. 註冊完成後，記錄**應用程式（用戶端）識別碼**  即 **Teams Bot App ID**。
+3. 前往**憑證和密碼**  **新增用戶端密碼**，新增密碼並記錄密碼值  即 **Teams Bot App Password**。
 
-**Microsoft Teams（Azure China / Azure Global 均可）：**
-
-1. 在 Azure 门户中，进入 **Microsoft Entra ID** → **应用注册** → **新注册**：
-   - 名称：任意（如 `openclaw-teams-bot`）
-   - 受支持的帐户类型：选择**仅此组织目录中的帐户（单租户）**
-   - 重定向 URI：留空
-   - 点击**注册**
-2. 注册完成后，记录**应用程序(客户端) ID** — 即 **Teams Bot App ID**。
-3. 进入**证书和密码** → **新客户端密码**，添加密码并记录密码值 — 即 **Teams Bot App Password**。
-
-部署时提供以上两个参数（要么全填，要么全部留空）。模板会自动创建 Azure Bot Service 并关联 Teams Channel，无需手动配置。模板自动使用当前 Azure tenant 作为 Teams tenant ID，无需手动填写。
+部署時提供以上兩個參數（要嘛全填，要嘛全部留空）。範本會自動建立 Azure Bot Service 並關聯 Teams Channel，無需手動設定。範本自動使用當前 Azure 租用戶作為 Teams tenant ID，無需手動填寫。
 
 ## 4. 部署到 Azure
 
-### 方式 A：一键部署（推荐）
+### 方式 A：一鍵部署（建議）
 
-1. 点击上方的 **Deploy to Azure** 按钮，登录 Azure 账号。
-2. 选择或创建一个**资源组 (Resource Group)**。
-3. 填写表单参数：
-   - `vmName`：虚拟机名称
-   - `adminUsername`：SSH 用户名（默认 `azureuser`）
-   - `sshPublicKey`：粘贴第 1 步获得的 SSH 公钥内容
-   - `vmSize`：虚拟机规格（默认 `Standard_B2as_v2`）
-   - Azure OpenAI 相关参数（可选，见第 2 步）
-   - 飞书 / Teams 通道参数（可选，见第 3 步）
-4. 点击**查看 + 创建** → **创建**，等待部署完成。
-5. 部署完成后，点击左侧**输出 (Outputs)**，记录：
-   - `vmPublicFqdn`：虚拟机公网域名（用于 SSH 登录）
-   - `vmPrincipalId`：VM 托管标识 ID（Managed Identity 模式需要）
+1. 點擊上方的 **Deploy to Azure** 按鈕，登入 Azure 帳號。
+2. 選擇或建立一個**資源群組 (Resource Group)**。
+3. 填寫表單參數：
+   - `vmName`：虛擬機器名稱
+   - `adminUsername`：SSH 使用者名稱（預設 `azureuser`）
+   - `sshPublicKey`：貼上第 1 步取得的 SSH 公鑰內容
+   - `vmSize`：虛擬機器規格（預設 `Standard_B2as_v2`）
+   - Azure OpenAI 相關參數（選填，見第 2 步）
+   - Teams 通道參數（選填，見第 3 步）
+4. 點擊**檢閱 + 建立**  **建立**，等待部署完成。
+5. 部署完成後，點擊左側**輸出 (Outputs)**，記錄：
+   - `vmPublicFqdn`：虛擬機器公用網域名稱（用於 SSH 登入）
+   - `vmPrincipalId`：VM 受控識別識別碼（Managed Identity 模式需要）
 
 ### 方式 B：Azure CLI 部署
 
 ```bash
-# Azure 中国区用户先执行: az cloud set --name AzureChinaCloud
+# Azure 中國區使用者先執行: az cloud set --name AzureChinaCloud
 az login
 
 az group create --name rg-openclaw --location southeastasia
@@ -102,11 +97,11 @@ az deployment group create \
     azureOpenAiDeployment="gpt-5.2" \
     azureOpenAiApiKey="your-api-key"
 
-# Managed Identity 模式（推荐）：省略 azureOpenAiApiKey，改 azureOpenAiAuthMode=managedIdentity
-# 不接入 Azure OpenAI：省略所有 azureOpenAi* 参数
+# Managed Identity 模式（建議）：省略 azureOpenAiApiKey，改 azureOpenAiAuthMode=managedIdentity
+# 不接入 Azure OpenAI：省略所有 azureOpenAi* 參數
 ```
 
-查看部署输出：
+檢視部署輸出：
 ```bash
 az deployment group show \
   --name openclaw-deploy \
@@ -114,21 +109,21 @@ az deployment group show \
   --query properties.outputs
 ```
 
-## 5.（Managed Identity 模式）部署后分配角色
+## 5.（Managed Identity 模式）部署後指派角色
 
-如果您选择了 Managed Identity 认证模式，模板会**自动尝试**为 VM 的托管标识分配 `Cognitive Services OpenAI User` 角色。
+如果您選擇了 Managed Identity 認證模式，範本會**自動嘗試**為 VM 的受控識別指派 `Cognitive Services OpenAI User` 角色。
 
-- **权限充足时（Owner / User Access Administrator）：** 角色自动分配成功，无需额外操作。
-- **权限不足时（如 Contributor）：** 角色分配会失败，Azure 门户可能显示部署为"部分失败"。但 **VM、OpenClaw、MI 代理服务全部正常运行**，不需要重新部署。您只需手动补上角色，下一次 chat 请求即可正常工作。
+- **權限足夠時（Owner / User Access Administrator）：** 角色自動指派成功，無需額外操作。
+- **權限不足時（如 Contributor）：** 角色指派會失敗，Azure 入口網站可能顯示部署為「部分失敗」。但 **VM、OpenClaw、MI 代理服務全部正常運行**，不需要重新部署。您只需手動補上角色，下一次 chat 要求即可正常運作。
 
-部署输出中的 `azureOpenAiRoleAssignmentHint` 包含可直接复制执行的完整 `az role assignment create` 命令。
+部署輸出中的 `azureOpenAiRoleAssignmentHint` 包含可直接複製執行的完整 `az role assignment create` 命令。
 
-**通过 Azure 门户分配：**
-1. 打开 Azure OpenAI 资源 → **访问控制 (IAM)** → **添加角色分配**。
-2. 角色选 **Cognitive Services OpenAI User**，成员选**托管标识**，搜索并选择您的虚拟机。
-3. **审查 + 分配**。
+**透過 Azure 入口網站指派：**
+1. 開啟 Azure OpenAI 資源  **存取控制 (IAM)**  **新增角色指派**。
+2. 角色選 **Cognitive Services OpenAI User**，成員選**受控識別**，搜尋並選擇您的虛擬機器。
+3. **檢閱 + 指派**。
 
-**通过 Azure CLI 分配：**
+**透過 Azure CLI 指派：**
 ```bash
 vm_principal_id=$(az deployment group show \
   --name <deployment-name> \
@@ -141,9 +136,9 @@ az role assignment create \
   --scope "/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.CognitiveServices/accounts/<openai-resource-name>"
 ```
 
-> 执行此命令的用户需要 Owner、User Access Administrator 或 Role Based Access Control Administrator 角色。角色分配生效后，下一次 chat 请求即可正常工作。
+> 執行此命令的使用者需要 Owner、User Access Administrator 或 Role Based Access Control Administrator 角色。角色指派生效後，下一次 chat 要求即可正常運作。
 
-## 6. SSH 登录虚拟机
+## 6. SSH 登入虛擬機器
 
 **Windows（PowerShell）：**
 ```powershell
@@ -155,63 +150,63 @@ ssh -i "$env:USERPROFILE\.ssh\id_ed25519" azureuser@<vmPublicFqdn>
 ssh -i ~/.ssh/id_ed25519 azureuser@<vmPublicFqdn>
 ```
 
-将 `<vmPublicFqdn>` 替换为部署输出中的域名。
+將 `<vmPublicFqdn>` 替換為部署輸出中的網域名稱。
 
-## 7. 获取 Web 控制台地址并打开浏览器
+## 7. 取得 Web 控制台網址並開啟瀏覽器
 
-SSH 登录虚拟机后，执行：
+SSH 登入虛擬機器後，執行：
 ```bash
 openclaw-browser-url
 ```
 
-输出示例：
+輸出範例：
 ```
 Dashboard URL: https://your-hostname/#token=...
 ```
 
-将完整 URL 复制到浏览器中打开。
+將完整 URL 複製到瀏覽器中開啟。
 
-## 8. 浏览器配对授权
+## 8. 瀏覽器配對授權
 
-如果浏览器页面提示 `pairing required`，**保持页面打开**，回到 SSH 终端执行：
+如果瀏覽器頁面提示 `pairing required`，**保持頁面開啟**，回到 SSH 終端執行：
 ```bash
 openclaw-approve-browser
 ```
 
-该 helper reads the local browser pairing queue directly 并批准最新的 Control UI 请求。如果提示没有待处理的配对请求，请保持浏览器停留在配对页面，等待几秒后重试。命令执行完毕后，回到浏览器刷新页面即可。
+該 helper 會直接讀取本機瀏覽器配對佇列並批准最新的 Control UI 要求。如果提示沒有待處理的配對要求，請保持瀏覽器停留在配對頁面，等待幾秒後重試。命令執行完畢後，回到瀏覽器重新整理頁面即可。
 
-> OpenClaw 上游 `2026.3.12` 到 `2026.3.13` 期间存在已知的 loopback WebSocket 握手回归，`openclaw devices list` 可能报错，但本模板的 `openclaw-approve-browser` 不依赖该路径。
+> OpenClaw 上游 `2026.3.12` 到 `2026.3.13` 期間存在已知的 loopback WebSocket 交握回歸，`openclaw devices list` 可能報錯，但本範本的 `openclaw-approve-browser` 不依賴該路徑。
 
-## 9.（可选）Teams 部署后配置
+## 9.（選填）Teams 部署後設定
 
-如果部署时填写了 Teams 参数，模板已自动创建 Azure Bot Service。部署完成后，需要生成 Teams 应用包并上传到 Teams：
+如果部署時填寫了 Teams 參數，範本已自動建立 Azure Bot Service。部署完成後，需要產生 Teams 應用程式套件並上傳到 Teams：
 
-1. 在本地 PowerShell 中运行（需要先 clone 本仓库）：
+1. 在本機 PowerShell 中執行（需要先 clone 本儲存庫）：
    ```powershell
    ./teams-app-package/build-app-package.ps1 `
      -AppId "<Teams Bot App ID>" `
      -BotDomain "<vmPublicFqdn>"
    ```
-   将 `<Teams Bot App ID>` 替换为第 3 步获取的应用 ID，`<vmPublicFqdn>` 替换为部署输出中的域名。脚本生成的 zip 文件位于 `teams-app-package/dist/` 目录。
+   將 `<Teams Bot App ID>` 替換為第 3 步取得的應用程式識別碼，`<vmPublicFqdn>` 替換為部署輸出中的網域名稱。指令碼產生的 zip 檔案位於 `teams-app-package/dist/` 目錄。
 
-2. 打开 Microsoft Teams → 左侧**应用** → **管理你的应用** → **上传自定义应用**，选择生成的 zip 文件上传。
+2. 開啟 Microsoft Teams  左側**應用程式**  **管理您的應用程式**  **上傳自訂應用程式**，選擇產生的 zip 檔案上傳。
 
-3. 上传成功后，向 Bot 发送一条私聊消息。Bot 会返回一个配对码（pairing code）。
+3. 上傳成功後，向 Bot 傳送一則私訊。Bot 會回傳一個配對碼（pairing code）。
 
-4. SSH 登录 VM，执行以下命令完成配对：
+4. SSH 登入 VM，執行以下命令完成配對：
    ```bash
    openclaw-approve-teams-pairing
    ```
-   该 helper 会自动获取最新的 Teams 配对请求并批准。也可以手动传入配对码：
+   該 helper 會自動取得最新的 Teams 配對要求並批准。也可以手動傳入配對碼：
    ```bash
    openclaw-approve-teams-pairing <pairing-code>
    ```
 
-配对完成后即可在 Teams 中正常与 Bot 对话。
+配對完成後即可在 Teams 中正常與 Bot 對話。
 
-## 10. （可选）后续升级
+## 10.（選填）後續升級
 
-本模板使用官方 `install-cli.sh` 安装器将 CLI 和专用 Node 运行时装到用户的 `~/.openclaw` 前缀下，再通过 `openclaw onboard --non-interactive --install-daemon` 完成 gateway 安装，最后通过 `openclaw config` 写入 Azure 传入的配置。
+本範本使用官方 `install-cli.sh` 安裝器將 CLI 和專用 Node 執行階段裝到使用者的 `~/.openclaw` 前綴下，再透過 `openclaw onboard --non-interactive --install-daemon` 完成 gateway 安裝，最後透過 `openclaw config` 寫入 Azure 傳入的設定。
 
 ```bash
 openclaw update
@@ -219,14 +214,14 @@ openclaw doctor
 openclaw gateway restart
 ```
 
-如果启用了 Teams，升级后可能需要补装扩展依赖：
+如果啟用了 Teams，升級後可能需要補裝擴充功能相依性：
 ```bash
 export PATH="$HOME/.openclaw/tools/node/bin:$HOME/.openclaw/bin:$PATH"
 npm install --omit=dev --prefix "$HOME/.openclaw/lib/node_modules/openclaw/extensions/msteams"
 systemctl --user restart openclaw-gateway
 ```
 
-如需完全重跑安装器：
+如需完全重跑安裝器：
 ```bash
 curl -fsSL https://openclaw.ai/install-cli.sh | bash -s -- --prefix "$HOME/.openclaw" --node-version 24.14.0 --no-onboard
 bash -c '. /etc/openclaw/openclaw.env && openclaw onboard --non-interactive --accept-risk --mode local --workspace /data/workspace --auth-choice skip --gateway-port "$OPENCLAW_GATEWAY_PORT" --gateway-bind loopback --gateway-auth token --gateway-token "$OPENCLAW_GATEWAY_TOKEN" --install-daemon --daemon-runtime node --skip-channels --skip-skills'
@@ -235,46 +230,46 @@ openclaw doctor
 openclaw gateway restart
 ```
 
-## 11.（可选）切换 Gateway 模式
+## 11.（選填）切換 Gateway 模式
 
-SSH 管理员默认走本机 loopback gateway。如需切到公网 `wss://` gateway 排查问题：
+SSH 管理員預設走本機 loopback gateway。如需切到公網 `wss://` gateway 排查問題：
 ```bash
 openclaw-use-public-gateway
 ```
-该 helper 会按这台 VM 的 current local device identity 去匹配并自动批准对应的 pending request，然后用 `openclaw health --verbose` 验证公网路径可用后才持久化切换。
+該 helper 會按這台 VM 的 current local device identity 去比對並自動批准對應的 pending request，然後用 `openclaw health --verbose` 驗證公網路徑可用後才持久化切換。
 
-切回默认 loopback：
+切回預設 loopback：
 ```bash
 openclaw-use-loopback-gateway
 ```
 
-切换后需 reconnect SSH，运行以下命令确认：
+切換後需重新連線 SSH，執行以下命令確認：
 ```bash
 openclaw-gateway-mode current
 ```
 
-## 常见问题
+## 常見問題
 
-**SSH 报错 `Permission denied (publickey)`**
-> 私钥与部署时使用的公钥不匹配。确保使用 `-i` 指定正确的私钥文件。
+**SSH 報錯 `Permission denied (publickey)`**
+> 私鑰與部署時使用的公鑰不符。確保使用 `-i` 指定正確的私鑰檔案。
 
-**SSH 报错 `UNPROTECTED PRIVATE KEY FILE`**
-> 私钥文件权限过宽。Windows 执行 `icacls $Key /inheritance:r` 等命令修复；macOS/Linux 执行 `chmod 600 <私钥文件>`。
+**SSH 報錯 `UNPROTECTED PRIVATE KEY FILE`**
+> 私鑰檔案權限過寬。Windows 執行 `icacls $Key /inheritance:r` 等命令修復；macOS/Linux 執行 `chmod 600 <私鑰檔案>`。
 
-**SSH 报错 `REMOTE HOST IDENTIFICATION HAS CHANGED!`**
-> VM 重建导致主机指纹变化。执行 `ssh-keygen -R <vmPublicFqdn>` 后重新连接。
+**SSH 報錯 `REMOTE HOST IDENTIFICATION HAS CHANGED!`**
+> VM 重建導致主機指紋變更。執行 `ssh-keygen -R <vmPublicFqdn>` 後重新連線。
 
-**浏览器报错 `502 Bad Gateway`**
-> 部署刚完成时，请等待 1-2 分钟。如持续报错，SSH 登录 VM 执行：
+**瀏覽器報錯 `502 Bad Gateway`**
+> 部署剛完成時，請等待 1-2 分鐘。如持續報錯，SSH 登入 VM 執行：
 > ```bash
 > sudo systemctl status openclaw-gateway caddy --no-pager
 > sudo journalctl -u openclaw-gateway -n 100 --no-pager
 > ```
 
-**无法连接虚拟机（Connection Timed Out）**
-> 在 Azure 门户确认 VM 处于 Running 状态、已分配公网 IP，且 NSG 允许 22 和 443 端口入站。
+**無法連線虛擬機器（Connection Timed Out）**
+> 在 Azure 入口網站確認 VM 處於 Running 狀態、已指派公用 IP，且 NSG 允許 22 和 443 連接埠輸入。
 
-> **环境说明：** 模板会为管理员用户预装 Homebrew 到 `/home/linuxbrew/.linuxbrew` 并配置 passwordless sudo。VM 作为管理员专用主机使用。
+> **環境說明：** 範本會為管理員使用者預裝 Homebrew 到 `/home/linuxbrew/.linuxbrew` 並設定 passwordless sudo。VM 作為管理員專用主機使用。
 
 ---
 
@@ -297,7 +292,7 @@ ssh-keygen -t ed25519 -C "openclaw-azure"
 cat ~/.ssh/id_ed25519.pub
 ```
 
-Copy the public key output — you will paste it into the deployment form later.
+Copy the public key output  you will paste it into the deployment form later.
 
 ## 2. (Optional) Prepare Azure OpenAI Information
 
@@ -310,28 +305,23 @@ If you want Azure OpenAI ready immediately after deployment, prepare the followi
 | API Key | Required | Not needed |
 | Azure OpenAI Resource Group | Not needed | When cross-resource-group |
 
-In Managed Identity mode, the template automatically attempts to assign the `Cognitive Services OpenAI User` role to the VM. If the deploying user lacks sufficient permissions, the role assignment fails but the VM and OpenClaw are fully deployed and functional (the Azure portal may show the deployment as "partially failed"). Just assign the role manually afterward — no redeployment needed (see Step 5).
+In Managed Identity mode, the template automatically attempts to assign the `Cognitive Services OpenAI User` role to the VM. If the deploying user lacks sufficient permissions, the role assignment fails but the VM and OpenClaw are fully deployed and functional (the Azure portal may show the deployment as "partially failed"). Just assign the role manually afterward  no redeployment needed (see Step 5).
 
 > **Azure China users:** Azure OpenAI is not available in Azure China, so Managed Identity mode cannot be used. Please choose API Key mode or skip Azure OpenAI configuration.
 
 Leave all Azure OpenAI fields empty to skip.
 
-## 3. (Optional) Prepare Channel Integration Information
+## 3. (Optional) Prepare Microsoft Teams Channel Integration
 
-**Feishu (Azure China / Azure Global):** Create a self-built enterprise app on the Feishu Open Platform, enable bot capability, add the `im.message.receive_v1` event subscription with WebSocket long-connection mode, publish the app, then obtain:
-- **Feishu App ID** and **Feishu App Secret** (provide both or leave both empty)
-
-**Microsoft Teams (Azure China / Azure Global):**
-
-1. In the Azure portal, go to **Microsoft Entra ID** → **App registrations** → **New registration**:
+1. In the Azure portal, go to **Microsoft Entra ID**  **App registrations**  **New registration**:
    - Name: any name (e.g. `openclaw-teams-bot`)
    - Supported account types: **Accounts in this organizational directory only (Single tenant)**
    - Redirect URI: leave blank
    - Click **Register**
-2. After registration, note the **Application (client) ID** — this is the **Teams Bot App ID**.
-3. Go to **Certificates & secrets** → **New client secret**, add a secret and note the secret value — this is the **Teams Bot App Password**.
+2. After registration, note the **Application (client) ID**  this is the **Teams Bot App ID**.
+3. Go to **Certificates & secrets**  **New client secret**, add a secret and note the secret value  this is the **Teams Bot App Password**.
 
-Provide both parameters during deployment (or leave both empty). The template automatically creates the Azure Bot Service and connects the Teams Channel — no manual configuration needed. The template also uses the current Azure tenant as the Teams tenant ID.
+Provide both parameters during deployment (or leave both empty). The template automatically creates the Azure Bot Service and connects the Teams Channel  no manual configuration needed. The template also uses the current Azure tenant as the Teams tenant ID.
 
 ## 4. Deploy to Azure
 
@@ -345,8 +335,8 @@ Provide both parameters during deployment (or leave both empty). The template au
    - `sshPublicKey`: paste the SSH public key from Step 1
    - `vmSize`: virtual machine size (default `Standard_B2as_v2`)
    - Azure OpenAI parameters (optional, see Step 2)
-   - Feishu / Teams channel parameters (optional, see Step 3)
-4. Click **Review + create** → **Create** and wait for deployment to finish.
+   - Teams channel parameters (optional, see Step 3)
+4. Click **Review + create**  **Create** and wait for deployment to finish.
 5. After deployment, open **Outputs** on the left and note:
    - `vmPublicFqdn`: public domain name (for SSH login)
    - `vmPrincipalId`: VM managed identity ID (needed for Managed Identity mode)
@@ -389,12 +379,12 @@ az deployment group show \
 If you chose Managed Identity authentication, the template **automatically attempts** to assign the `Cognitive Services OpenAI User` role to the VM's managed identity.
 
 - **When permissions are sufficient (Owner / User Access Administrator):** The role is assigned automatically. No further action needed.
-- **When permissions are insufficient (e.g. Contributor):** The role assignment fails, and the Azure portal may show the deployment as "partially failed". However, **the VM, OpenClaw, and MI proxy service are all fully functional** — no redeployment is needed. Just assign the role manually, and the next chat request will work immediately.
+- **When permissions are insufficient (e.g. Contributor):** The role assignment fails, and the Azure portal may show the deployment as "partially failed". However, **the VM, OpenClaw, and MI proxy service are all fully functional**  no redeployment is needed. Just assign the role manually, and the next chat request will work immediately.
 
 The deployment output `azureOpenAiRoleAssignmentHint` contains the exact `az role assignment create` command you can copy and run.
 
 **Via Azure Portal:**
-1. Open your Azure OpenAI resource → **Access control (IAM)** → **Add role assignment**.
+1. Open your Azure OpenAI resource  **Access control (IAM)**  **Add role assignment**.
 2. Select role **Cognitive Services OpenAI User**, choose **Managed identity**, search for your VM.
 3. **Review + assign**.
 
@@ -464,7 +454,7 @@ If you provided Teams parameters during deployment, the template has already cre
    ```
    Replace `<Teams Bot App ID>` with the app ID from Step 3, and `<vmPublicFqdn>` with the domain from deployment outputs. The generated zip file is in `teams-app-package/dist/`.
 
-2. Open Microsoft Teams → **Apps** on the left → **Manage your apps** → **Upload a custom app**, and upload the generated zip file.
+2. Open Microsoft Teams  **Apps** on the left  **Manage your apps**  **Upload a custom app**, and upload the generated zip file.
 
 3. After upload, send a direct message to the bot. The bot will return a pairing code.
 
