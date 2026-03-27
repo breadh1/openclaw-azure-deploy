@@ -11,9 +11,9 @@ Azure 全球使用者 / Azure Global users:
 <a id="zh-cn"></a>
 # 中文部署指南
 
-## 1. 準備 SSH 金鑰
+## 1. 準備 SSH 金鑰 (用於存取VM)
 
-如果您已有 SSH 金鑰對，可以跳過此步驟。
+如果您已有 SSH 金鑰公鑰及私鑰，可以跳過此步驟。
 
 **Windows（PowerShell）：**
 ```powershell
